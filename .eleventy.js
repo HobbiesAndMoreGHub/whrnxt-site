@@ -13,6 +13,9 @@ module.exports = function (eleventyConfig) {
     })
   );
 
+  // W3C date (YYYY-MM-DD) for sitemap <lastmod>.
+  eleventyConfig.addFilter("isoDate", (d) => new Date(d).toISOString().slice(0, 10));
+
   // Newest-first collection of all articles in src/posts/*.md
   eleventyConfig.addCollection("post", (api) =>
     api.getFilteredByGlob("src/posts/*.md").sort((a, b) => b.date - a.date)
