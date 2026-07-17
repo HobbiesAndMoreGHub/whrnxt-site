@@ -3,6 +3,9 @@ title: Browse a city before you ever set foot in it
 description: You don't need to be standing somewhere — or turn on location — to plan it. Browse mode lets you scout any of 2,300+ cities from your couch.
 kicker: Feature
 date: 2026-07-10
+topics:
+  - Browsing
+  - Trip planning
 ---
 
 Half of a good trip happens before you leave. But most travel apps assume you're already *there* — they want your location, a signal, and a reason to nag you for permissions. WHRNXT doesn't.

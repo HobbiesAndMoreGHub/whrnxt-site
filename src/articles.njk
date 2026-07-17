@@ -10,16 +10,89 @@ permalink: /articles/index.html
     <h2>Articles</h2>
     <p>Guides for planning trips, finding your way, and getting more out of WHRNXT.</p>
   </div>
-  <div class="post-list">
+
+  <div class="article-filters" id="article-filters" hidden>
+    <input type="search" id="article-search" class="article-search" placeholder="Search articles…" aria-label="Search articles">
+    <div class="tag-row" id="tag-row"></div>
+  </div>
+
+  <div class="post-list" id="post-list">
     {% for post in collections.post %}
-      <a class="post-card" href="{{ post.url }}">
+      <a class="post-card" href="{{ post.url }}"
+         data-title="{{ post.data.title | lower }} {{ post.data.description | lower }}"
+         data-topics="{% for t in post.data.topics %}{{ t | lower }}|{% endfor %}">
         <span class="label">{{ post.data.kicker or "Guide" }}</span>
         <h3>{{ post.data.title }}</h3>
         <p>{{ post.data.description }}</p>
+        {% if post.data.topics %}<span class="post-tags">{% for t in post.data.topics %}<span class="chip">{{ t }}</span>{% endfor %}</span>{% endif %}
         <span class="post-date mono">{{ post.date | readableDate }}</span>
       </a>
     {% else %}
       <p class="empty">No articles yet — check back soon.</p>
     {% endfor %}
   </div>
+  <p class="empty" id="no-match" hidden>No articles match that filter.</p>
 </div></section>
+
+{% raw %}<script>
+(function(){
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.post-card'));
+  if(!cards.length) return;
+  var filters = document.getElementById('article-filters');
+  var tagRow  = document.getElementById('tag-row');
+  var search  = document.getElementById('article-search');
+  var noMatch = document.getElementById('no-match');
+
+  var counts = {};
+  cards.forEach(function(c){
+    (c.getAttribute('data-topics')||'').split('|').forEach(function(t){
+      t = t.trim(); if(t){ counts[t] = (counts[t]||0)+1; }
+    });
+  });
+  var topics = Object.keys(counts).sort();
+  if(!topics.length){ return; }
+  filters.hidden = false;
+
+  var active = null;
+  function cap(s){ return s.replace(/\b\w/g, function(m){ return m.toUpperCase(); }); }
+  function addBtn(label, val){
+    var b = document.createElement('button');
+    b.className = 'tag-btn'; b.textContent = label; b.dataset.val = val || '';
+    b.addEventListener('click', function(){ active = val || null; render(); sync(); syncURL(); });
+    tagRow.appendChild(b);
+  }
+  addBtn('All', '');
+  topics.forEach(function(t){ addBtn(cap(t), t); });
+
+  function sync(){
+    Array.prototype.forEach.call(tagRow.children, function(b){
+      b.classList.toggle('on', (b.dataset.val||'') === (active||''));
+    });
+  }
+  function render(){
+    var q = (search.value||'').trim().toLowerCase();
+    var shown = 0;
+    cards.forEach(function(c){
+      var tstr = c.getAttribute('data-topics')||'';
+      var arr  = tstr.split('|').filter(Boolean);
+      var title = c.getAttribute('data-title')||'';
+      var okTag = !active || arr.indexOf(active) !== -1;
+      var okQ = !q || title.indexOf(q) !== -1 || tstr.indexOf(q) !== -1;
+      var show = okTag && okQ;
+      c.style.display = show ? '' : 'none';
+      if(show) shown++;
+    });
+    noMatch.hidden = shown > 0;
+  }
+  function syncURL(){
+    var u = new URL(window.location);
+    if(active) u.searchParams.set('tag', active); else u.searchParams.delete('tag');
+    history.replaceState(null, '', u);
+  }
+  search.addEventListener('input', render);
+
+  var initial = new URLSearchParams(location.search).get('tag');
+  if(initial){ initial = initial.toLowerCase(); if(counts[initial]) active = initial; }
+  sync(); render();
+})();
+</script>{% endraw %}

@@ -3,6 +3,10 @@ title: Turn your next layover into a day trip
 description: A long connection isn't dead time — it's a free stop. Here's how to plan a tight, walkable half-day without stress.
 kicker: How-to
 date: 2026-07-14
+topics:
+  - Layovers
+  - Day trips
+  - Trip planning
 ---
 
 A six-hour layover feels like punishment. But strip out the airport dwell time and you've often got **three good hours in a city you'd never have visited on purpose** — Reykjavík, Doha, a small US hub with a surprisingly good downtown. The trick is planning a loop tight enough that you're never sweating the clock.

@@ -7,6 +7,7 @@ layout: base.njk
   <h1 class="article-title">{{ title }}</h1>
   {% if description %}<p class="article-dek">{{ description }}</p>{% endif %}
   <p class="article-meta mono">{{ date | readableDate }}</p>
+  {% if topics %}<div class="post-tags article-tags">{% for t in topics %}<a class="chip" href="/articles/?tag={{ t | lower | urlencode }}">{{ t }}</a>{% endfor %}</div>{% endif %}
   <div class="prose">
     {{ content | safe }}
   </div>

@@ -27,6 +27,7 @@ collections:
       - { label: "Title", name: "title", widget: "string" }
       - { label: "Summary", name: "description", widget: "text", hint: "One line — shown on the /articles list and in search/social previews." }
       - { label: "Kicker", name: "kicker", widget: "string", default: "Guide", required: false, hint: "Small label above the title, e.g. Guide, How-to, Feature." }
+      - { label: "Topics / tags", name: "topics", widget: "list", required: false, hint: "City names and themes — become filterable tags at /articles. e.g. Orlando, Food, Layovers." }
       - { label: "Date", name: "date", widget: "datetime" }
       - { label: "Body", name: "body", widget: "markdown" }
 
