@@ -1,0 +1,43 @@
+backend:
+  name: git-gateway
+  branch: main
+
+media_folder: "src/assets/uploads"
+public_folder: "/assets/uploads"
+
+site_url: https://whrnxt.net
+display_url: https://whrnxt.net
+
+collections:
+  - name: "articles"
+    label: "Articles"
+    label_singular: "Article"
+    description: "Blog posts shown at /articles. New ones appear automatically, newest first."
+    folder: "src/posts"
+    create: true
+    slug: "{{slug}}"
+    extension: "md"
+    format: "yaml-frontmatter"
+    summary: "{{title}}  ·  {{date | date('YYYY-MM-DD')}}"
+    sortable_fields: ["date", "title"]
+    fields:
+      - { label: "Title", name: "title", widget: "string" }
+      - { label: "Summary", name: "description", widget: "text", hint: "One line — shown on the /articles list and in search/social previews." }
+      - { label: "Kicker", name: "kicker", widget: "string", default: "Guide", required: false, hint: "Small label above the title, e.g. Guide, How-to, Feature." }
+      - { label: "Date", name: "date", widget: "datetime" }
+      - { label: "Body", name: "body", widget: "markdown" }
+
+  - name: "settings"
+    label: "Site settings"
+    files:
+      - name: "site"
+        label: "Site info"
+        file: "src/_data/site.json"
+        description: "Name, tagline, and links used across the whole site."
+        fields:
+          - { label: "Name", name: "name", widget: "string" }
+          - { label: "Tagline", name: "tagline", widget: "string" }
+          - { label: "Description", name: "description", widget: "text" }
+          - { label: "Site URL", name: "url", widget: "string" }
+          - { label: "App URL", name: "appUrl", widget: "string" }
+          - { label: "Contact email", name: "email", widget: "string" }

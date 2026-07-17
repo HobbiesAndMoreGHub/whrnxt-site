@@ -2,6 +2,10 @@ module.exports = function (eleventyConfig) {
   // Copy the CSS (and any future images) straight through to the built site.
   eleventyConfig.addPassthroughCopy({ "src/assets": "assets" });
 
+  // Decap CMS admin — copy verbatim, don't run it through the template engine.
+  eleventyConfig.addPassthroughCopy("src/admin");
+  eleventyConfig.ignores.add("src/admin/index.html");
+
   // Human-readable date filter for articles.
   eleventyConfig.addFilter("readableDate", (d) =>
     new Date(d).toLocaleDateString("en-US", {
