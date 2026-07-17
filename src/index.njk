@@ -1,0 +1,103 @@
+---
+layout: base.njk
+---
+<main id="top">
+  <section class="hero"><div class="wrap hero-grid">
+    <div>
+      <span class="kicker label"><span class="dot"></span>Where next &middot; travel, sorted</span>
+      <h1>Every city, one&nbsp;clear <em>next stop.</em></h1>
+      <p class="lead">WHRNXT turns a place you've never been into a plan you can actually follow — sights, food, and transit for 2,300+ cities, with a trip you can share in a tap.</p>
+      <div class="cta-row">
+        <a class="btn btn-signal" href="{{ site.appUrl }}">Open the app &#9656;</a>
+        <a class="btn btn-ghost" href="#plan">See how it works</a>
+      </div>
+      <div class="trust">
+        <span><b>Free</b> to use</span>
+        <span><b>No login</b> needed</span>
+        <span><b>Works offline</b></span>
+      </div>
+    </div>
+    <div class="board" aria-label="Sample of the app showing next stops in New York">
+      <div class="board-top"><span class="board-city">NEW YORK, USA</span><span class="mono">NEXT UP &middot; 0.7 MI</span></div>
+      <div class="row next"><span class="tag">NEXT</span><span class="name">The High Line<small>Elevated park &middot; Sightseeing</small></span><span class="eta">0.4 mi<br>~9 min</span></div>
+      <div class="row"><span class="tag">EAT</span><span class="name">Chelsea Market<small>Food hall &middot; 35 vendors</small></span><span class="eta">0.5 mi</span></div>
+      <div class="row"><span class="tag">SEE</span><span class="name">Whitney Museum<small>Modern American art</small></span><span class="eta">0.6 mi</span></div>
+      <div class="row"><span class="tag">RAIL</span><span class="name">14 St &ndash; 8 Av Station<small>A &middot; C &middot; E &middot; L lines</small></span><span class="eta">0.3 mi</span></div>
+      <div class="board-foot"><span>DAY 2 OF 4 &middot; 6 STOPS</span><span>OPTIMIZED &#9656;</span></div>
+    </div>
+  </div></section>
+
+  <div class="ticker" aria-hidden="true"><div class="ticker-in">
+    <span><b>2,300+</b> cities</span><span><b>60,000+</b> places</span><span>PARIS &middot; PAR</span><span>TOKYO &middot; TYO</span><span>NANTUCKET &middot; ACK</span><span><b>Offline</b> ready</span><span>MOAB &middot; CNY</span><span>CAPE TOWN &middot; CPT</span><span><b>No</b> login</span><span>TELLURIDE &middot; TEX</span>
+    <span><b>2,300+</b> cities</span><span><b>60,000+</b> places</span><span>PARIS &middot; PAR</span><span>TOKYO &middot; TYO</span><span>NANTUCKET &middot; ACK</span><span><b>Offline</b> ready</span><span>MOAB &middot; CNY</span><span>CAPE TOWN &middot; CPT</span><span><b>No</b> login</span><span>TELLURIDE &middot; TEX</span>
+  </div></div>
+
+  <section class="block" id="find"><div class="wrap">
+    <div class="sec-head">
+      <span class="label">What it does</span>
+      <h2>Get your bearings anywhere — then keep moving.</h2>
+      <p>WHRNXT isn't a list of links. It's a hand-picked guide to what's worth your time in each place, measured from wherever you're standing.</p>
+    </div>
+    <div class="feat">
+      <div class="card">
+        <span class="label">Find</span>
+        <svg class="pin" width="22" height="22" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z"/></svg>
+        <h3>Sights &amp; food for 2,300+ cities</h3>
+        <p>From Tokyo to a small airport town, browse the places actually worth visiting — sorted by distance, with the real transit hubs to reach them. Preview any city without turning on location.</p>
+      </div>
+      <div class="card" id="plan">
+        <span class="label">Plan</span>
+        <svg class="pin" width="22" height="22" viewBox="0 0 24 24"><path fill="currentColor" d="M4 5h16v2H4Zm0 6h10v2H4Zm0 6h16v2H4Z"/></svg>
+        <h3>A trip that plans the walking for you</h3>
+        <p>Add your stops and WHRNXT chains them into the shortest sensible day. Then it hands you a share link — friends open the exact plan, no account and no app-store detour.</p>
+      </div>
+      <div class="card" id="transit">
+        <span class="label">Transit</span>
+        <svg class="pin" width="22" height="22" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2c-4 0-8 .5-8 4v9.5A2.5 2.5 0 0 0 6.5 18L5 19.5V20h2l2-2h6l2 2h2v-.5L17.5 18A2.5 2.5 0 0 0 20 15.5V6c0-3.5-4-4-8-4ZM7.5 17A1.5 1.5 0 1 1 9 15.5 1.5 1.5 0 0 1 7.5 17Zm9 0a1.5 1.5 0 1 1 1.5-1.5 1.5 1.5 0 0 1-1.5 1.5ZM18 11H6V6h12Z"/></svg>
+        <h3>Airports &amp; stations, sorted</h3>
+        <p>Every city shows its real transit. Tap "nearby cities' transit" and WHRNXT pulls in the airports and stations within reach — deduped and nearest-first, so you see one Newark, not eighteen.</p>
+      </div>
+      <div class="card">
+        <span class="label">Offline</span>
+        <svg class="pin" width="22" height="22" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9 9 9 0 0 0-9-9Zm6.7 7H14.4A9.9 9.9 0 0 0 12.9 5.1 7 7 0 0 1 18.7 10ZM12 5a9.9 9.9 0 0 1 1.5 5h-3A9.9 9.9 0 0 1 12 5ZM5.3 10a7 7 0 0 1 4.1-4.4A11.7 11.7 0 0 0 8 10Zm0 4H8a11.7 11.7 0 0 0 1.4 4.4A7 7 0 0 1 5.3 14ZM12 19a9.9 9.9 0 0 1-1.5-3.5h3A9.9 9.9 0 0 1 12 19Zm-1.9-5.5a13 13 0 0 1 0-3h3.8a13 13 0 0 1 0 3Zm4.5 3.9A11.7 11.7 0 0 0 16 14h2.7a7 7 0 0 1-4.1 4.4Z"/></svg>
+        <h3>Works with no signal</h3>
+        <p>WHRNXT runs in your browser and keeps working on the plane, underground, or abroad without data. Nothing to install, no sign-up, and it's free.</p>
+      </div>
+    </div>
+  </div></section>
+
+  <section class="block" id="share" style="padding-top:0"><div class="wrap"><div class="split">
+    <div class="panel-lg">
+      <span class="label">Community</span>
+      <h2>Made a good trip? Share it.</h2>
+      <p>Drop a WHRNXT share link (or any trip link). No account needed — every trip is reviewed by a human before it goes live for other travelers.</p>
+      <form name="share-trip" method="POST" data-netlify="true" netlify-honeypot="bot-field" action="/thanks/">
+        <input type="hidden" name="form-name" value="share-trip">
+        <p hidden><label>Leave blank: <input name="bot-field"></label></p>
+        <label class="f" for="t-title">Trip title</label>
+        <input id="t-title" name="title" placeholder="A long weekend in Lisbon" required>
+        <div class="form-row">
+          <div><label class="f" for="t-cities">Cities</label><input id="t-cities" name="cities" placeholder="Lisbon, Sintra"></div>
+          <div><label class="f" for="t-link">Share link</label><input id="t-link" name="link" type="url" placeholder="https://whrnxt.netlify.app/?i=…" required></div>
+        </div>
+        <button class="btn btn-signal" type="submit" style="align-self:flex-start;margin-top:6px">Post trip &#9656;</button>
+      </form>
+      <p class="fine">Reviewed and approved before it appears &mdash; no spam, no junk links.</p>
+      <a class="browse" href="{{ site.appUrl }}">Browse shared trips &#9656;</a>
+    </div>
+    <div class="panel-lg">
+      <span class="label">Launch list</span>
+      <h2>Get the drop on the native apps.</h2>
+      <p>The iPhone and Android versions are on the way. The web app is live and free today — leave your email and we'll tell you the moment the apps land.</p>
+      <form name="notify" method="POST" data-netlify="true" netlify-honeypot="bot-field" action="/thanks/">
+        <input type="hidden" name="form-name" value="notify">
+        <p hidden><label>Leave blank: <input name="bot-field"></label></p>
+        <label class="f" for="n-email">Email</label>
+        <input id="n-email" name="email" type="email" placeholder="you@example.com" required>
+        <button class="btn btn-signal" type="submit" style="align-self:flex-start;margin-top:6px">Notify me &#9656;</button>
+      </form>
+      <p class="fine">One email when the apps launch. No newsletter, no noise.</p>
+      <div style="margin-top:26px" class="trust"><span><span class="mono" style="color:var(--go)">&#9679;</span> Web app live now</span><span><b>iOS &amp; Android</b> next</span></div>
+    </div>
+  </div></div></section>
+</main>

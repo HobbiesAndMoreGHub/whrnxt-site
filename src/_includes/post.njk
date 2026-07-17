@@ -1,0 +1,14 @@
+---
+layout: base.njk
+---
+<article class="article"><div class="wrap article-wrap">
+  <a class="back-link" href="/articles/">&#8592; All articles</a>
+  <p class="label article-kicker">{{ kicker or "Guide" }}</p>
+  <h1 class="article-title">{{ title }}</h1>
+  {% if description %}<p class="article-dek">{{ description }}</p>{% endif %}
+  <p class="article-meta mono">{{ date | readableDate }}</p>
+  <div class="prose">
+    {{ content | safe }}
+  </div>
+  <a class="btn btn-signal article-cta" href="{{ site.appUrl }}">Open WHRNXT &#9656;</a>
+</div></article>

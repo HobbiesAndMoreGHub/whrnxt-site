@@ -1,0 +1,25 @@
+---
+layout: base.njk
+title: Articles
+description: Guides for planning trips, finding your way, and getting more out of WHRNXT.
+permalink: /articles/index.html
+---
+<section class="block"><div class="wrap">
+  <div class="sec-head">
+    <span class="label">Field notes</span>
+    <h2>Articles</h2>
+    <p>Guides for planning trips, finding your way, and getting more out of WHRNXT.</p>
+  </div>
+  <div class="post-list">
+    {% for post in collections.post %}
+      <a class="post-card" href="{{ post.url }}">
+        <span class="label">{{ post.data.kicker or "Guide" }}</span>
+        <h3>{{ post.data.title }}</h3>
+        <p>{{ post.data.description }}</p>
+        <span class="post-date mono">{{ post.date | readableDate }}</span>
+      </a>
+    {% else %}
+      <p class="empty">No articles yet — check back soon.</p>
+    {% endfor %}
+  </div>
+</div></section>
