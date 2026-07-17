@@ -5,3 +5,7 @@
 
 [build.environment]
   NODE_VERSION = "20"
+
+# Decap CMS GitHub OAuth handler
+[functions]
+  directory = "netlify/functions"

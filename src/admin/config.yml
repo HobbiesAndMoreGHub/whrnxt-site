@@ -1,6 +1,9 @@
 backend:
-  name: git-gateway
+  name: github
+  repo: HobbiesAndMoreGHub/whrnxt-site
   branch: main
+  base_url: https://whrnxt.net
+  auth_endpoint: /.netlify/functions/auth
 
 media_folder: "src/assets/uploads"
 public_folder: "/assets/uploads"
