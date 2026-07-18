@@ -17,13 +17,26 @@ layout: base.njk
         <span><b>Works offline</b></span>
       </div>
     </div>
-    <div class="board" aria-label="Sample of the app showing next stops in New York">
-      <div class="board-top"><span class="board-city">NEW YORK, USA</span><span class="mono">NEXT UP &middot; 0.7 MI</span></div>
-      <div class="row next"><span class="tag">NEXT</span><span class="name">The High Line<small>Elevated park &middot; Sightseeing</small></span><span class="eta">0.4 mi<br>~9 min</span></div>
-      <div class="row"><span class="tag">EAT</span><span class="name">Chelsea Market<small>Food hall &middot; 35 vendors</small></span><span class="eta">0.5 mi</span></div>
-      <div class="row"><span class="tag">SEE</span><span class="name">Whitney Museum<small>Modern American art</small></span><span class="eta">0.6 mi</span></div>
-      <div class="row"><span class="tag">RAIL</span><span class="name">14 St &ndash; 8 Av Station<small>A &middot; C &middot; E &middot; L lines</small></span><span class="eta">0.3 mi</span></div>
-      <div class="board-foot"><span>DAY 2 OF 4 &middot; 6 STOPS</span><span>OPTIMIZED &#9656;</span></div>
+    <div class="demo" id="demo">
+      <div class="demo-bar">
+        <span class="demo-status" id="demo-status"><span class="demo-dot"></span>Browsing New York</span>
+        <span class="mono">LIVE &mdash; not a screenshot</span>
+      </div>
+      <div class="demo-screen">
+        <iframe
+          id="demo-frame"
+          class="demo-frame"
+          title="WHRNXT app, live demo browsing New York"
+          src="{{ site.appUrl }}/?embed=1&amp;city=newyork"
+          loading="lazy"
+          allow="geolocation"
+          referrerpolicy="origin"></iframe>
+      </div>
+      <div class="demo-foot">
+        <button class="btn btn-signal" id="demo-locate" type="button">Use my location &#9656;</button>
+        <a class="btn btn-ghost" href="{{ site.appUrl }}">Open full app</a>
+      </div>
+      <p class="demo-fine" id="demo-fine">Browsing New York &mdash; no location needed. Pick any city inside, or switch to where you actually are.</p>
     </div>
   </div></section>
 
@@ -101,3 +114,46 @@ layout: base.njk
     </div>
   </div></div></section>
 </main>
+
+{% raw %}<script>
+(function(){
+  var frame  = document.getElementById('demo-frame');
+  var locate = document.getElementById('demo-locate');
+  var status = document.getElementById('demo-status');
+  var fine   = document.getElementById('demo-fine');
+  if(!frame || !locate) return;
+
+  var APP_ORIGIN = new URL(frame.src).origin;
+
+  function send(type){
+    if(frame.contentWindow) frame.contentWindow.postMessage({type:type}, APP_ORIGIN);
+  }
+
+  locate.addEventListener('click', function(){
+    if(locate.dataset.mode === 'current'){ send('whrnxt:browse'); return; }
+    // The iframe carries allow="geolocation", so the app's own request prompts here.
+    send('whrnxt:use-location');
+    locate.textContent = 'Locating…';
+    locate.disabled = true;
+  });
+
+  // The app reports its mode back so the button reflects what's actually on screen.
+  window.addEventListener('message', function(e){
+    if(e.origin !== APP_ORIGIN) return;
+    var d = e.data;
+    if(!d || d.type !== 'whrnxt:mode') return;
+    locate.disabled = false;
+    if(d.browseMode === 'current'){
+      locate.dataset.mode = 'current';
+      locate.textContent = 'Back to browsing ▸';
+      status.innerHTML = '<span class="demo-dot"></span>Your location';
+      fine.textContent = 'Showing places near you. Switch back to browse any other city.';
+    } else {
+      locate.dataset.mode = 'browse';
+      locate.textContent = 'Use my location ▸';
+      status.innerHTML = '<span class="demo-dot"></span>Browsing' + (d.city ? '' : ' New York');
+      fine.textContent = 'Browsing — no location needed. Pick any city inside, or switch to where you actually are.';
+    }
+  });
+})();
+</script>{% endraw %}
