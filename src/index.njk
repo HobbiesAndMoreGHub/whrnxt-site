@@ -129,6 +129,16 @@ layout: base.njk
     if(frame.contentWindow) frame.contentWindow.postMessage({type:type}, APP_ORIGIN);
   }
 
+  // Rebuild the status pill as nodes — the city name crosses a frame boundary,
+  // so it goes in as text, never as markup.
+  function setStatus(text){
+    status.textContent = '';
+    var dot = document.createElement('span');
+    dot.className = 'demo-dot';
+    status.appendChild(dot);
+    status.appendChild(document.createTextNode(text));
+  }
+
   locate.addEventListener('click', function(){
     if(locate.dataset.mode === 'current'){ send('whrnxt:browse'); return; }
     // The iframe carries allow="geolocation", so the app's own request prompts here.
@@ -146,12 +156,12 @@ layout: base.njk
     if(d.browseMode === 'current'){
       locate.dataset.mode = 'current';
       locate.textContent = 'Back to browsing ▸';
-      status.innerHTML = '<span class="demo-dot"></span>Your location';
+      setStatus('Your location');
       fine.textContent = 'Showing places near you. Switch back to browse any other city.';
     } else {
       locate.dataset.mode = 'browse';
       locate.textContent = 'Use my location ▸';
-      status.innerHTML = '<span class="demo-dot"></span>Browsing' + (d.city ? '' : ' New York');
+      setStatus('Browsing ' + (d.cityName || 'New York'));
       fine.textContent = 'Browsing — no location needed. Pick any city inside, or switch to where you actually are.';
     }
   });
