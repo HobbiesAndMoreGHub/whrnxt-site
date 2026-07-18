@@ -8,22 +8,61 @@ permalink: /trips/index.html
   <div class="sec-head">
     <span class="label">Community</span>
     <h2>Shared trips</h2>
-    <p>Trips other travelers built and posted. Open one in the app and it becomes yours to follow, edit, or reorder. Every link here is checked by a person before it appears.</p>
+    <p>Trips other travelers built and posted. Open one in the app and it becomes yours to follow, edit, or reorder. Every trip is reviewed by a person before it shows up here.</p>
   </div>
 
-  <div class="trip-list">
-    {% for trip in trips.trips %}
-      <a class="trip-card" href="{{ trip.link }}" rel="nofollow noopener">
-        {% if trip.cities %}<span class="label">{{ trip.cities }}</span>{% endif %}
-        <h3>{{ trip.title }}</h3>
-        {% if trip.note %}<p>{{ trip.note }}</p>{% endif %}
-        <span class="trip-open mono">Open in the app &#9656;</span>
-      </a>
-    {% else %}
-      <div class="trip-empty">
-        <p><strong>No trips posted yet.</strong> Be the first — build an itinerary in the app, tap <strong>Share</strong>, and post the link.</p>
-        <a class="btn btn-signal" href="/#share">Post a trip &#9656;</a>
-      </div>
-    {% endfor %}
+  <div class="trip-list" id="trip-list">
+    <p class="trip-loading" id="trip-loading">Loading trips…</p>
+  </div>
+
+  <div class="trip-empty" id="trip-empty" hidden>
+    <p><strong>No trips posted yet.</strong> Be the first — build an itinerary in the app, tap <strong>Share</strong>, and post the link.</p>
+    <a class="btn btn-signal" href="/#share">Post a trip &#9656;</a>
   </div>
 </div></section>
+
+{% raw %}<script>
+(function(){
+  var API = {% endraw %}{{ site.apiUrl | dump | safe }}{% raw %};
+  var list = document.getElementById('trip-list');
+  var loading = document.getElementById('trip-loading');
+  var empty = document.getElementById('trip-empty');
+
+  function card(t){
+    var a = document.createElement('a');
+    a.className = 'trip-card';
+    a.href = t.link;                    // server only stores https URLs
+    a.rel = 'nofollow noopener';
+    if (t.cities) {
+      var c = document.createElement('span');
+      c.className = 'label'; c.textContent = t.cities;
+      a.appendChild(c);
+    }
+    var h = document.createElement('h3');
+    h.textContent = t.title;            // text, never markup — this is stranger-submitted
+    a.appendChild(h);
+    if (t.note) {
+      var p = document.createElement('p');
+      p.textContent = t.note;
+      a.appendChild(p);
+    }
+    var open = document.createElement('span');
+    open.className = 'trip-open mono';
+    open.textContent = 'Open in the app ▸';
+    a.appendChild(open);
+    return a;
+  }
+
+  fetch(API + '/api/trips')
+    .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function(d){
+      var trips = (d && d.trips) || [];
+      loading.remove();
+      if (!trips.length) { empty.hidden = false; return; }
+      trips.forEach(function(t){ list.appendChild(card(t)); });
+    })
+    .catch(function(){
+      loading.textContent = 'Could not load trips just now — please try again shortly.';
+    });
+})();
+</script>{% endraw %}

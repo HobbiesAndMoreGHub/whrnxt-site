@@ -83,18 +83,17 @@ layout: base.njk
       <span class="label">Community</span>
       <h2>Made a good trip? Share it.</h2>
       <p>Post a WHRNXT share link (or any trip link). No account needed.</p>
-      <form name="share-trip" method="POST" data-netlify="true" netlify-honeypot="bot-field" action="/thanks/">
-        <input type="hidden" name="form-name" value="share-trip">
-        <p hidden><label>Leave blank: <input name="bot-field"></label></p>
+      <form id="trip-form" novalidate>
+        <p hidden><label>Leave blank: <input name="website" tabindex="-1" autocomplete="off"></label></p>
         <label class="f" for="t-title">Trip title</label>
         <input id="t-title" name="title" placeholder="A long weekend in Lisbon" required>
         <div class="form-row">
           <div><label class="f" for="t-cities">Cities</label><input id="t-cities" name="cities" placeholder="Lisbon, Sintra"></div>
           <div><label class="f" for="t-link">Share link</label><input id="t-link" name="link" type="url" placeholder="https://app.whrnxt.net/?i=…" required></div>
         </div>
-        <button class="btn btn-signal" type="submit" style="align-self:flex-start;margin-top:6px">Post trip &#9656;</button>
+        <button class="btn btn-signal" type="submit" id="trip-submit" style="align-self:flex-start;margin-top:6px">Post trip &#9656;</button>
       </form>
-      <p class="fine">Reviewed and approved before it appears &mdash; no spam, no junk links.</p>
+      <p class="fine" id="trip-msg">Your trip is held for review and goes live once approved &mdash; no spam, no junk links.</p>
       <a class="browse" href="/trips/">Browse shared trips &#9656;</a>
     </div>
     <div class="panel-lg">
@@ -137,6 +136,55 @@ layout: base.njk
 </main>
 
 {% raw %}<script>
+// Trip submission → held as pending on the server until a human approves it.
+(function(){
+  var API = {% endraw %}{{ site.apiUrl | dump | safe }}{% raw %};
+  var form = document.getElementById('trip-form');
+  var msg  = document.getElementById('trip-msg');
+  var btn  = document.getElementById('trip-submit');
+  if(!form) return;
+
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    var title = form.title.value.trim();
+    var link  = form.link.value.trim();
+    if(!title || !link){ msg.textContent = 'A title and a share link are both needed.'; return; }
+    btn.disabled = true;
+    var was = btn.textContent;
+    btn.textContent = 'Posting…';
+    fetch(API + '/api/trips', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: title,
+        cities: form.cities.value.trim(),
+        link: link,
+        website: form.website.value,   // honeypot
+      }),
+    })
+    .then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
+    .then(function(res){
+      if(!res.ok){
+        var why = res.d && res.d.error === 'bad_link'
+          ? 'That link does not look like a valid https link.'
+          : res.d && res.d.error === 'rate_limited'
+            ? 'That is a lot of trips at once — try again in a few minutes.'
+            : 'Something went wrong posting that. Please try again.';
+        msg.textContent = why;
+        btn.disabled = false; btn.textContent = was;
+        return;
+      }
+      form.reset();
+      form.style.display = 'none';
+      msg.textContent = 'Thanks — your trip is in the queue. It appears on the Shared trips page once a human approves it.';
+    })
+    .catch(function(){
+      msg.textContent = 'Could not reach the server. Please try again shortly.';
+      btn.disabled = false; btn.textContent = was;
+    });
+  });
+})();
+
 (function(){
   var frame  = document.getElementById('demo-frame');
   var locate = document.getElementById('demo-locate');
