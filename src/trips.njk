@@ -1,0 +1,29 @@
+---
+layout: base.njk
+title: Shared trips
+description: Trips other travelers built in WHRNXT and shared — open any one in the app and follow it yourself.
+permalink: /trips/index.html
+---
+<section class="block"><div class="wrap">
+  <div class="sec-head">
+    <span class="label">Community</span>
+    <h2>Shared trips</h2>
+    <p>Trips other travelers built and posted. Open one in the app and it becomes yours to follow, edit, or reorder. Every link here is checked by a person before it appears.</p>
+  </div>
+
+  <div class="trip-list">
+    {% for trip in trips.trips %}
+      <a class="trip-card" href="{{ trip.link }}" rel="nofollow noopener">
+        {% if trip.cities %}<span class="label">{{ trip.cities }}</span>{% endif %}
+        <h3>{{ trip.title }}</h3>
+        {% if trip.note %}<p>{{ trip.note }}</p>{% endif %}
+        <span class="trip-open mono">Open in the app &#9656;</span>
+      </a>
+    {% else %}
+      <div class="trip-empty">
+        <p><strong>No trips posted yet.</strong> Be the first — build an itinerary in the app, tap <strong>Share</strong>, and post the link.</p>
+        <a class="btn btn-signal" href="/#share">Post a trip &#9656;</a>
+      </div>
+    {% endfor %}
+  </div>
+</div></section>

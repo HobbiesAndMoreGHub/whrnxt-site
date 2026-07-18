@@ -31,6 +31,25 @@ collections:
       - { label: "Date", name: "date", widget: "datetime" }
       - { label: "Body", name: "body", widget: "markdown" }
 
+  - name: "trips"
+    label: "Shared trips"
+    description: "Approved trip links shown at /trips. Nothing appears on the site until you add it here."
+    files:
+      - name: "trips"
+        label: "Shared trips list"
+        file: "src/_data/trips.json"
+        fields:
+          - label: "Trips"
+            name: "trips"
+            widget: "list"
+            label_singular: "Trip"
+            summary: "{{fields.title}}  ·  {{fields.cities}}"
+            fields:
+              - { label: "Title", name: "title", widget: "string", hint: "e.g. A long weekend in Lisbon" }
+              - { label: "Cities", name: "cities", widget: "string", required: false, hint: "Shown as the small label on the card. e.g. Lisbon, Sintra" }
+              - { label: "Share link", name: "link", widget: "string", hint: "The WHRNXT share link submitted by the traveler." }
+              - { label: "Note", name: "note", widget: "text", required: false, hint: "One line about the trip, optional." }
+
   - name: "settings"
     label: "Site settings"
     files:

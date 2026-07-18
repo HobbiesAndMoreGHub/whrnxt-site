@@ -19,15 +19,14 @@ layout: base.njk
     </div>
     <div class="demo" id="demo">
       <div class="demo-bar">
-        <span class="demo-status" id="demo-status"><span class="demo-dot"></span>Browsing New York</span>
-        <span class="mono">LIVE &mdash; not a screenshot</span>
+        <span class="demo-status mono" id="demo-mode"><span class="demo-dot"></span>BROWSING MODE &mdash; location set as Rome, Italy.</span>
       </div>
       <div class="demo-screen">
         <iframe
           id="demo-frame"
           class="demo-frame"
           title="WHRNXT app, live demo browsing New York"
-          src="{{ site.appUrl }}/?embed=1&amp;city=newyork"
+          src="{{ site.appUrl }}/?embed=1&amp;city=rome"
           loading="lazy"
           allow="geolocation"
           referrerpolicy="origin"></iframe>
@@ -36,7 +35,7 @@ layout: base.njk
         <button class="btn btn-signal" id="demo-locate" type="button">Use my location &#9656;</button>
         <a class="btn btn-ghost" href="{{ site.appUrl }}">Open full app</a>
       </div>
-      <p class="demo-fine" id="demo-fine">Browsing New York &mdash; no location needed. Pick any city inside, or switch to where you actually are.</p>
+      <p class="demo-fine" id="demo-fine">Browsing Rome &mdash; no location needed. Pick any city inside, or switch to where you actually are.</p>
     </div>
   </div></section>
 
@@ -83,7 +82,7 @@ layout: base.njk
     <div class="panel-lg">
       <span class="label">Community</span>
       <h2>Made a good trip? Share it.</h2>
-      <p>Drop a WHRNXT share link (or any trip link). No account needed — every trip is reviewed by a human before it goes live for other travelers.</p>
+      <p>Post a WHRNXT share link (or any trip link). No account needed.</p>
       <form name="share-trip" method="POST" data-netlify="true" netlify-honeypot="bot-field" action="/thanks/">
         <input type="hidden" name="form-name" value="share-trip">
         <p hidden><label>Leave blank: <input name="bot-field"></label></p>
@@ -96,21 +95,43 @@ layout: base.njk
         <button class="btn btn-signal" type="submit" style="align-self:flex-start;margin-top:6px">Post trip &#9656;</button>
       </form>
       <p class="fine">Reviewed and approved before it appears &mdash; no spam, no junk links.</p>
-      <a class="browse" href="{{ site.appUrl }}">Browse shared trips &#9656;</a>
+      <a class="browse" href="/trips/">Browse shared trips &#9656;</a>
     </div>
     <div class="panel-lg">
-      <span class="label">Launch list</span>
-      <h2>Get the drop on the native apps.</h2>
-      <p>The iPhone and Android versions are on the way. The web app is live and free today — leave your email and we'll tell you the moment the apps land.</p>
-      <form name="notify" method="POST" data-netlify="true" netlify-honeypot="bot-field" action="/thanks/">
-        <input type="hidden" name="form-name" value="notify">
-        <p hidden><label>Leave blank: <input name="bot-field"></label></p>
-        <label class="f" for="n-email">Email</label>
-        <input id="n-email" name="email" type="email" placeholder="you@example.com" required>
-        <button class="btn btn-signal" type="submit" style="align-self:flex-start;margin-top:6px">Notify me &#9656;</button>
-      </form>
-      <p class="fine">One email when the apps launch. No newsletter, no noise.</p>
-      <div style="margin-top:26px" class="trust"><span><span class="mono" style="color:var(--go)">&#9679;</span> Web app live now</span><span><b>iOS &amp; Android</b> next</span></div>
+      <span class="label">How to use it</span>
+      <h2>Four modes, one app.</h2>
+      <p>WHRNXT works differently depending on what you're doing — standing somewhere, planning ahead, or following a route you already built. Pick a mode to see how it works.</p>
+
+      <div class="modes">
+        <div class="mode-tabs" role="tablist" aria-label="App modes">
+          <button class="mode-tab is-on" role="tab" aria-selected="true"  aria-controls="mode-current"  id="tab-current"  data-mode="current">Current</button>
+          <button class="mode-tab"       role="tab" aria-selected="false" aria-controls="mode-browsing" id="tab-browsing" data-mode="browsing">Browsing</button>
+          <button class="mode-tab"       role="tab" aria-selected="false" aria-controls="mode-planning" id="tab-planning" data-mode="planning">Trip planner</button>
+          <button class="mode-tab"       role="tab" aria-selected="false" aria-controls="mode-saved"    id="tab-saved"    data-mode="saved">Saved</button>
+        </div>
+
+        <div class="mode-panel" role="tabpanel" id="mode-current" aria-labelledby="tab-current">
+          <p class="mode-why">For when you're already somewhere and want to know what's around you.</p>
+          <p>Tap <strong>Current</strong> at the top so WHRNXT uses your GPS. Move between the <strong>Sights</strong>, <strong>Events</strong>, <strong>Food</strong>, and <strong>Transit</strong> tabs — everything is listed nearest-first. Tap a place for details, directions, or to book a ride, and swipe left/right inside it to flip through the list. In <strong>Settings</strong>, <strong>Show nearby within</strong> limits the list to a distance you choose.</p>
+        </div>
+
+        <div class="mode-panel" role="tabpanel" id="mode-browsing" aria-labelledby="tab-browsing" hidden>
+          <p class="mode-why">For sizing up a city you haven't reached yet — no location needed.</p>
+          <p>Tap the <strong>Current</strong> button to switch to <strong>Browsing</strong>, then pick any city. You'll see its places as if you were standing in the middle of it, with distances measured from the city center. Tap <strong>Browsing</strong> again to snap back to where you really are. This is the mode running in the demo above.</p>
+        </div>
+
+        <div class="mode-panel" role="tabpanel" id="mode-planning" aria-labelledby="tab-planning" hidden>
+          <p class="mode-why">For turning a pile of places into a day you can actually walk.</p>
+          <p>Tap the <strong>Planning</strong> tab, then <strong>New itinerary</strong>. Use <strong>Add Day</strong> to pick that day's city, then <strong>Add stops</strong> — the list re-sorts by distance from your last stop, so the route builds itself. Tap the <strong>⚓ anchor</strong> to lock a stop in place and <strong>✨ Optimize route</strong> to arrange the rest around it. Then <strong>▶ Launch day</strong> to follow it live, or <strong>Share</strong> to send it to someone as a link.</p>
+        </div>
+
+        <div class="mode-panel" role="tabpanel" id="mode-saved" aria-labelledby="tab-saved" hidden>
+          <p class="mode-why">For the places you want to keep, rename, or annotate for yourself.</p>
+          <p>Tap the <strong>★</strong> on any place to save it, and find everything you've starred in the <strong>★</strong> tab. Open a place and tap <strong>✏️</strong> to give it your own name ("Mom's favorite pizza"), or jot a private note below the address ("gate code 1234") — both stay on your device and are never shared. The <strong>📍</strong> button adds your own spots: pin exactly where you're standing, or search an address and drag the pin.</p>
+        </div>
+      </div>
+
+      <div style="margin-top:22px" class="trust"><span><span class="mono" style="color:var(--go)">&#9679;</span> Web app live now</span><span><b>iOS &amp; Android</b> next</span></div>
     </div>
   </div></div></section>
 </main>
@@ -119,7 +140,7 @@ layout: base.njk
 (function(){
   var frame  = document.getElementById('demo-frame');
   var locate = document.getElementById('demo-locate');
-  var status = document.getElementById('demo-status');
+  var mode   = document.getElementById('demo-mode');
   var fine   = document.getElementById('demo-fine');
   if(!frame || !locate) return;
 
@@ -129,14 +150,14 @@ layout: base.njk
     if(frame.contentWindow) frame.contentWindow.postMessage({type:type}, APP_ORIGIN);
   }
 
-  // Rebuild the status pill as nodes — the city name crosses a frame boundary,
+  // Rebuild the status line as nodes — the city name crosses a frame boundary,
   // so it goes in as text, never as markup.
-  function setStatus(text){
-    status.textContent = '';
+  function setMode(text){
+    mode.textContent = '';
     var dot = document.createElement('span');
     dot.className = 'demo-dot';
-    status.appendChild(dot);
-    status.appendChild(document.createTextNode(text));
+    mode.appendChild(dot);
+    mode.appendChild(document.createTextNode(text));
   }
 
   locate.addEventListener('click', function(){
@@ -156,14 +177,38 @@ layout: base.njk
     if(d.browseMode === 'current'){
       locate.dataset.mode = 'current';
       locate.textContent = 'Back to browsing ▸';
-      setStatus('Your location');
+      setMode('CURRENT MODE — using your real location.');
       fine.textContent = 'Showing places near you. Switch back to browse any other city.';
     } else {
       locate.dataset.mode = 'browse';
       locate.textContent = 'Use my location ▸';
-      setStatus('Browsing ' + (d.cityName || 'New York'));
-      fine.textContent = 'Browsing — no location needed. Pick any city inside, or switch to where you actually are.';
+      var city = d.cityName || 'Rome, Italy';
+      setMode('BROWSING MODE — location set as ' + city + '.');
+      fine.textContent = 'Browsing ' + city + ' — no location needed. Pick any city inside, or switch to where you actually are.';
     }
+  });
+})();
+
+// How-to mode carousel
+(function(){
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('.mode-tab'));
+  if(!tabs.length) return;
+  function show(tab){
+    tabs.forEach(function(t){
+      var on = t === tab;
+      t.classList.toggle('is-on', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+  }
+  tabs.forEach(function(t){
+    t.addEventListener('click', function(){ show(t); });
+    t.addEventListener('keydown', function(e){
+      var i = tabs.indexOf(t), n = null;
+      if(e.key === 'ArrowRight') n = tabs[(i + 1) % tabs.length];
+      else if(e.key === 'ArrowLeft') n = tabs[(i - 1 + tabs.length) % tabs.length];
+      if(n){ e.preventDefault(); show(n); n.focus(); }
+    });
   });
 })();
 </script>{% endraw %}

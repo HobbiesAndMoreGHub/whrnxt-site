@@ -2,6 +2,10 @@ module.exports = function (eleventyConfig) {
   // Copy the CSS (and any future images) straight through to the built site.
   eleventyConfig.addPassthroughCopy({ "src/assets": "assets" });
 
+  // Icons belong at the site root — iOS probes /apple-touch-icon.png directly,
+  // so they can't live under /assets. Copies of the app's own icons.
+  eleventyConfig.addPassthroughCopy({ "src/icons": "." });
+
   // Decap CMS admin — copy verbatim, don't run it through the template engine.
   eleventyConfig.addPassthroughCopy("src/admin");
   eleventyConfig.ignores.add("src/admin/index.html");
