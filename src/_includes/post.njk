@@ -5,11 +5,43 @@ layout: base.njk
   <a class="back-link" href="/articles/">&#8592; All articles</a>
   <p class="label article-kicker">{{ kicker or "Guide" }}</p>
   <h1 class="article-title">{{ title }}</h1>
-  {% if description %}<p class="article-dek">{{ description }}</p>{% endif %}
+  {% if description %}<p class="article-dek">{{ description }}{% if itinerary %} <a class="itinerary-link" href="{{ itinerary }}">Open this itinerary in WHRNXT &#8594;</a>{% endif %}</p>{% endif %}
   <p class="article-meta mono">{{ date | readableDate }}</p>
   {% if topics %}<div class="post-tags article-tags">{% for t in topics %}<a class="chip" href="/articles/?tag={{ t | lower | urlencode }}">{{ t }}</a>{% endfor %}</div>{% endif %}
   <div class="prose">
     {{ content | safe }}
   </div>
-  <a class="btn btn-signal article-cta" href="{{ site.appUrl }}">Open WHRNXT &#9656;</a>
+  <a class="btn btn-signal article-cta" href="{{ itinerary or site.appUrl }}">{% if itinerary %}Open this itinerary in WHRNXT{% else %}Open WHRNXT{% endif %} &#9656;</a>
 </div></article>
+{% if "wx-carousel" in content %}
+<script>
+(function () {
+  document.querySelectorAll('.wx-carousel').forEach(function (box) {
+    var track = box.querySelector('.wx-track');
+    var slides = box.querySelectorAll('.wx-slide');
+    var label = box.querySelector('.wx-count');
+    var prev = box.querySelector('[data-prev]');
+    var next = box.querySelector('[data-next]');
+    if (!track || slides.length < 2) return;
+    function index() {
+      var mid = track.scrollLeft + track.clientWidth / 2;
+      for (var i = 0; i < slides.length; i++) {
+        if (slides[i].offsetLeft + slides[i].offsetWidth > mid) return i;
+      }
+      return slides.length - 1;
+    }
+    function go(step) {
+      var i = Math.max(0, Math.min(slides.length - 1, index() + step));
+      track.scrollTo({ left: slides[i].offsetLeft, behavior: 'smooth' });
+    }
+    function update() {
+      if (label) label.textContent = (index() + 1) + ' / ' + slides.length;
+    }
+    if (prev) prev.addEventListener('click', function () { go(-1); });
+    if (next) next.addEventListener('click', function () { go(1); });
+    track.addEventListener('scroll', update, { passive: true });
+    update();
+  });
+})();
+</script>
+{% endif %}

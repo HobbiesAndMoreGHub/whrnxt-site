@@ -187,6 +187,38 @@ input::placeholder,textarea::placeholder{color:#5c6675}
 .prose hr{border:0;border-top:1px solid var(--line);margin:40px 0}
 .article-cta{margin-top:40px}
 
+/* the "open this itinerary" link that rides at the end of the summary */
+.itinerary-link{color:var(--signal);white-space:nowrap;font-weight:600;font-size:16px;
+  text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(255,209,90,.4)}
+.itinerary-link:hover{text-decoration-color:var(--signal)}
+
+/* photos in generated articles: credited stills and scroll-snap carousels */
+.prose figure{margin:28px 0}
+.prose figure img{display:block;width:100%;height:auto}
+.prose figcaption{margin-top:10px;color:var(--muted);font-size:13.5px;line-height:1.5}
+.prose figcaption a{color:var(--muted);text-decoration-color:rgba(255,255,255,.2)}
+.prose figcaption a:hover{color:var(--ink)}
+.wx-carousel{margin:28px 0;max-width:none}
+.wx-track{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;
+  scrollbar-width:thin;padding-bottom:10px;-webkit-overflow-scrolling:touch}
+.wx-slide{flex:0 0 100%;scroll-snap-align:center;margin:0;min-width:0}
+@media (min-width:700px){.wx-slide{flex-basis:66%}}
+.wx-slide img{width:100%;height:auto;aspect-ratio:4/3;object-fit:cover;display:block;
+  border-radius:12px;border:1px solid var(--line);background:#0d131d}
+.wx-nav{display:flex;align-items:center;gap:10px;margin-top:6px}
+.wx-nav button{font:inherit;font-size:14px;line-height:1;padding:7px 13px;cursor:pointer;
+  color:var(--muted);background:transparent;border:1px solid var(--line);border-radius:8px}
+.wx-nav button:hover{color:var(--ink);border-color:var(--signal)}
+.wx-count{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.06em}
+
+/* pronunciation hint — hover on a pointer, tap-to-focus on touch */
+.wx-say{border-bottom:1px dotted var(--muted);cursor:help;position:relative}
+.wx-say::after{content:attr(data-say);position:absolute;left:50%;bottom:130%;
+  transform:translateX(-50%);white-space:nowrap;font-family:var(--mono);font-size:12.5px;
+  letter-spacing:.02em;padding:6px 10px;border-radius:8px;background:#0d131d;color:var(--ink);
+  border:1px solid var(--line);opacity:0;pointer-events:none;transition:opacity .12s ease;z-index:5}
+.wx-say:hover::after,.wx-say:focus::after{opacity:1}
+
 /* footer */
 footer{border-top:1px solid var(--line);margin-top:24px;padding:40px 0 60px;color:var(--muted);font-size:14px}
 .foot-in{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;align-items:center}
