@@ -1,83 +1,117 @@
 ---
-title: How to turn Claude and Gemini AI chats into WHRNXT trip itineraries
-description: Learn how to prompt Claude and Gemini to build customized travel plans and import them directly into WHRNXT with a single link.
-kicker: Guide
+title: WHRNXT Itinerary Specification for LLMs (Claude, Gemini, ChatGPT)
+description: Technical specification and formatting instructions for AI models to generate WHRNXT trip itineraries, JSON payloads, and shareable links.
+kicker: Specification
 date: 2026-08-10
 topics:
   - AI
   - Claude
   - Gemini
-  - Trip planning
+  - ChatGPT
+  - API
 ---
 
-Planning a trip with AI models like **Claude** or **Gemini** is fast, flexible, and fun — but reading through a long wall of text while walking around a city isn't. 
+# WHRNXT Itinerary Specification for AI Models
 
-WHRNXT lets you bridge the gap: ask Claude or Gemini to generate a day-by-day plan, and import it straight into WHRNXT for offline maps, ordered walking routes, and shareable links.
-
----
-
-## Why use Claude or Gemini for trip planning?
-
-AI assistants excel at synthesizing recommendations based on your specific interests:
-- **Tailored themes**: "Give me a 3-day itinerary focused on architecture and coffee in Tokyo."
-- **Pacing constraints**: "Build a child-friendly day in London with maximum 3 stops."
-- **Budget & dietary preferences**: "Plan 4 days in Rome featuring vegetarian neighborhood spots."
-
-When you ask Claude or Gemini to structure the response for WHRNXT, you can turn that conversation into an interactive, offline-ready mobile itinerary in seconds.
+This document defines the schema, rules, and procedures for Large Language Models (Claude, Gemini, ChatGPT) to generate valid WHRNXT itineraries, JSON payloads, and import links.
 
 ---
 
-## Step-by-Step: Prompting Claude or Gemini
+## 1. Overview & Import Endpoints
 
-### 1. Copy the Prompt
-Copy and paste this prompt into Claude (claude.ai) or Gemini (gemini.google.com):
+WHRNXT accepts structured itinerary objects. An AI model can either:
+1. **Output raw JSON**: The user pastes the JSON directly into WHRNXT (**Itineraries → ⬇ Import from link**).
+2. **Submit via API Endpoint**: `POST https://api-production-9f8f.up.railway.app/api/itineraries/import`
+   - Returns: `{"url": "https://app.whrnxt.net/?i=SLUG", "slug": "SLUG"}`
 
-```text
-Please create a day-by-day travel itinerary for [CITY NAME] for [NUMBER OF DAYS] days.
-Format the output as a valid WHRNXT itinerary JSON object with the following structure:
+---
 
+## 2. JSON Schema Definition
+
+AI models generating a WHRNXT itinerary MUST output JSON adhering strictly to this schema:
+
+```json
 {
-  "title": "[Trip Title]",
+  "title": "String (1-120 chars) - Name of the trip",
   "days": [
     {
-      "label": "Day 1: [Theme/Area]",
-      "city": "[city-slug-e.g.-paris]",
-      "date": "YYYY-MM-DD",
+      "label": "String (1-80 chars) - Day title (e.g. 'Day 1: Historic Center')",
+      "city": "String - City slug in lowercase, hyphenated (e.g. 'paris', 'tokyo', 'new-york')",
+      "date": "String (optional) - Format 'YYYY-MM-DD'",
       "stops": [
         {
-          "name": "[Spot Name]",
-          "category": "sightseeing",
-          "address": "[Full Address]",
-          "latitude": 48.8584,
-          "longitude": 2.2945
+          "name": "String (1-120 chars) - Name of the location or sight",
+          "category": "String - One of: sightseeing, restaurant, cafe, nightlife, shopping, outdoor, museum, entertainment, saved",
+          "address": "String (optional) - Full address for geocoding fallback",
+          "latitude": "Number (-90 to 90) - Decimal latitude (e.g. 48.8584)",
+          "longitude": "Number (-180 to 180) - Decimal longitude (e.g. 2.2945)"
         }
       ]
     }
   ]
 }
-
-Categories can be: sightseeing, restaurant, cafe, nightlife, shopping, outdoor, museum, entertainment. Include valid latitude and longitude for each stop.
 ```
 
-### 2. Copy the AI Response
-The AI will generate the full itinerary structure for you. Copy the JSON snippet or the shared link output.
+---
 
-### 3. Import into WHRNXT
-1. Open [WHRNXT](https://app.whrnxt.net) on your phone or browser.
-2. Go to **Itineraries** → **⬇ Import from link**.
-3. Paste the text/link and tap **Import**.
+## 3. Mandatory Constraints & Rules
 
-WHRNXT will automatically load all your spots, map out the walking routes, and let you re-order or optimize with one tap!
+1. **Days Limit**: `days` array MUST contain between **1 and 31 days**.
+2. **Stops Limit**: Total `stops` across all days MUST NOT exceed **100 stops**. Each day SHOULD contain between **1 and 8 stops** for realistic pacing.
+3. **Coordinates**:
+   - `latitude` and `longitude` MUST be valid floating point numbers rounded to at least 4-5 decimal places.
+   - Do NOT pass `null` or string coordinates for `latitude`/`longitude`.
+4. **Categories**:
+   - MUST be one of: `sightseeing`, `restaurant`, `cafe`, `nightlife`, `shopping`, `outdoor`, `museum`, `entertainment`, `saved`.
+5. **City Slugs**:
+   - MUST be lowercase, stripped of accents/special characters, with spaces replaced by hyphens (e.g., `florence`, `rio-de-janeiro`, `kyoto`).
 
 ---
 
-## Tips for Best Results
+## 4. Example Output
 
-- **Specify exact locations**: Ask the AI to include exact street names or landmarks so geocoding and map coordinates are precise.
-- **Set a home base**: Mention your hotel or cruise port so WHRNXT can calculate realistic travel times to your first stop.
-- **Mix categories**: Ask for a mix of `sightseeing`, `cafe`, and `restaurant` stops for balanced days.
-- **Offline access**: Once imported into WHRNXT, your entire itinerary is saved on your device — no Wi-Fi or data required while exploring.
+When a user asks for a trip plan to Rome, output this exact JSON format:
+
+```json
+{
+  "title": "3 Days in Historic Rome",
+  "days": [
+    {
+      "label": "Day 1: Ancient Rome & Colosseum",
+      "city": "rome",
+      "date": "2026-09-10",
+      "stops": [
+        {
+          "name": "Colosseum",
+          "category": "sightseeing",
+          "address": "Piazza del Colosseo, 1, 00184 Roma RM, Italy",
+          "latitude": 41.8902,
+          "longitude": 12.4922
+        },
+        {
+          "name": "Roman Forum",
+          "category": "sightseeing",
+          "address": "Via dei Fori Imperiali, 00186 Roma RM, Italy",
+          "latitude": 41.8925,
+          "longitude": 12.4853
+        },
+        {
+          "name": "La Carbonara",
+          "category": "restaurant",
+          "address": "Piazza Panisperna, 214, 00184 Roma RM, Italy",
+          "latitude": 41.8962,
+          "longitude": 12.4928
+        }
+      ]
+    }
+  ]
+}
+```
 
 ---
 
-[Open WHRNXT App]({{ site.appUrl }}) and import your first AI-generated itinerary today!
+## 5. How Users Import the Generated Itinerary
+
+1. User copies the JSON snippet generated by the AI.
+2. User opens **https://app.whrnxt.net**.
+3. User selects **Itineraries → ⬇ Import from link**, pastes the JSON or link, and taps **Import**.
