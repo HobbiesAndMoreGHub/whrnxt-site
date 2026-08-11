@@ -2,7 +2,64 @@
 permalink: /robots.txt
 eleventyExcludeFromCollections: true
 ---
+# {{ site.name }} — {{ site.url }}
+#
+# Everything public here is open to search engines and to AI/LLM crawlers:
+# read it, index it, quote it, cite it. The only closed doors are the CMS
+# admin panel, the Netlify function endpoints, and the form thank-you page,
+# none of which are content.
+#
+# Note on groups: a crawler obeys ONLY the most specific group that names it
+# and ignores every other group, so each group below repeats the same rules.
+# Edit one, edit them all.
+
+# ─── Default: every crawler not named below ───
 User-agent: *
 Allow: /
+Disallow: /admin/
+Disallow: /thanks/
+Disallow: /.netlify/
+
+# ─── Search engines ───
+User-agent: Googlebot
+User-agent: Googlebot-Image
+User-agent: Bingbot
+User-agent: Slurp
+User-agent: DuckDuckBot
+User-agent: Applebot
+User-agent: Baiduspider
+User-agent: YandexBot
+Allow: /
+Disallow: /admin/
+Disallow: /thanks/
+Disallow: /.netlify/
+
+# ─── AI answer engines and LLM crawlers ───
+# Split into its own group only so the welcome is explicit; the rules match
+# the default group exactly. Removing a token here does not block it — it
+# just falls back to "User-agent: *" above.
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: Claude-User
+User-agent: Claude-SearchBot
+User-agent: anthropic-ai
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: DuckAssistBot
+User-agent: meta-externalagent
+User-agent: FacebookBot
+User-agent: Amazonbot
+User-agent: MistralAI-User
+User-agent: cohere-ai
+User-agent: YouBot
+User-agent: CCBot
+Allow: /
+Disallow: /admin/
+Disallow: /thanks/
+Disallow: /.netlify/
 
 Sitemap: {{ site.url }}/sitemap.xml
