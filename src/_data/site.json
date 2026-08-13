@@ -1,7 +1,7 @@
 {
   "name": "WHRNXT",
-  "tagline": "sights, food & transit for 2,300+ cities",
-  "description": "WHRNXT turns any city into a plan you can follow — sights, food, and transit across 2,300+ cities, with a trip planner you can share. Free, offline, no login.",
+  "tagline": "sights, food & transit for 2,900+ cities",
+  "description": "WHRNXT turns any city into a plan you can follow — sights, food, and transit across 2,900+ cities (73,000+ places), with a trip planner you can share. Free, saved on your phone, private & offline, no login.",
   "url": "https://whrnxt.net",
   "appUrl": "https://app.whrnxt.net",
   "apiUrl": "https://api-production-9f8f.up.railway.app",

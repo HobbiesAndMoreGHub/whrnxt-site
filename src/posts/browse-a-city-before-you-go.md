@@ -1,6 +1,6 @@
 ---
 title: Browse a city before you ever set foot in it
-description: You don't need to be standing somewhere — or turn on location — to plan it. Browse mode lets you scout any of 2,300+ cities from your couch.
+description: You don't need to be standing somewhere — or turn on location — to plan it. Browse mode lets you scout any of 2,900+ cities from your couch.
 kicker: Feature
 date: 2026-07-10
 topics:

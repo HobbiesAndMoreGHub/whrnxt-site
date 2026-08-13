@@ -4,17 +4,18 @@ layout: base.njk
 <main id="top">
   <section class="hero"><div class="wrap hero-grid">
     <div>
-      <span class="kicker label"><span class="dot"></span>Where next &middot; travel, sorted</span>
+      <span class="kicker label"><span class="dot"></span>Where next &middot; travel navigator</span>
       <h1>Every city, one&nbsp;clear <em>next stop.</em></h1>
-      <p class="lead">WHRNXT turns a place you've never been into a plan you can actually follow — sights, food, and transit for 2,300+ cities, with a trip you can share in a tap.</p>
+      <p class="lead">Sights, food, and transit for 2,900+ cities and 73,000+ places. Test the app live in the window here, build a trip, or launch full screen on your phone.</p>
       <div class="cta-row">
-        <a class="btn btn-signal" href="{{ site.appUrl }}">Open the app &#9656;</a>
-        <a class="btn btn-ghost" href="#plan">See how it works</a>
+        <a class="btn btn-signal" href="{{ site.appUrl }}">Open full app &#9656;</a>
+        <a class="btn btn-ghost" href="#how">See how it works</a>
       </div>
       <div class="trust">
         <span><b>Free</b> to use</span>
+        <span><b>Saved on your phone</b></span>
+        <span><b>Private &amp; offline</b></span>
         <span><b>No login</b> needed</span>
-        <span><b>Works offline</b></span>
       </div>
     </div>
     <div class="demo" id="demo">
@@ -25,7 +26,7 @@ layout: base.njk
         <iframe
           id="demo-frame"
           class="demo-frame"
-          title="WHRNXT app, live demo browsing New York"
+          title="WHRNXT app, live demo browsing Rome"
           src="{{ site.appUrl }}/?embed=1&amp;city=rome"
           loading="lazy"
           allow="geolocation"
@@ -40,48 +41,14 @@ layout: base.njk
   </div></section>
 
   <div class="ticker" aria-hidden="true"><div class="ticker-in">
-    <span><b>2,300+</b> cities</span><span><b>60,000+</b> places</span><span>PARIS</span><span>TOKYO</span><span>NANTUCKET</span><span><b>Works offline</b></span><span>CAPE TOWN</span><span>MOAB</span><span>KYOTO</span><span><b>No login</b></span><span>TELLURIDE</span><span>LISBON</span><span><b>Free</b></span>
-    <span><b>2,300+</b> cities</span><span><b>60,000+</b> places</span><span>PARIS</span><span>TOKYO</span><span>NANTUCKET</span><span><b>Works offline</b></span><span>CAPE TOWN</span><span>MOAB</span><span>KYOTO</span><span><b>No login</b></span><span>TELLURIDE</span><span>LISBON</span><span><b>Free</b></span>
+    <span><b>2,900+</b> cities</span><span><b>73,000+</b> places</span><span>PARIS</span><span>TOKYO</span><span>NANTUCKET</span><span><b>Works offline</b></span><span>CAPE TOWN</span><span>MOAB</span><span>KYOTO</span><span><b>Saved on phone</b></span><span>TELLURIDE</span><span>LISBON</span><span><b>Free &amp; private</b></span>
+    <span><b>2,900+</b> cities</span><span><b>73,000+</b> places</span><span>PARIS</span><span>TOKYO</span><span>NANTUCKET</span><span><b>Works offline</b></span><span>CAPE TOWN</span><span>MOAB</span><span>KYOTO</span><span><b>Saved on phone</b></span><span>TELLURIDE</span><span>LISBON</span><span><b>Free &amp; private</b></span>
   </div></div>
 
-  <section class="block" id="find"><div class="wrap">
-    <div class="sec-head">
-      <span class="label">What it does</span>
-      <h2>Get your bearings anywhere — then keep moving.</h2>
-      <p>WHRNXT isn't a list of links. It's a hand-picked guide to what's worth your time in each place, measured from wherever you're standing.</p>
-    </div>
-    <div class="feat">
-      <div class="card">
-        <span class="label">Find</span>
-        <svg class="pin" width="22" height="22" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z"/></svg>
-        <h3>Sights &amp; food for 2,300+ cities</h3>
-        <p>From Tokyo to a small airport town, browse the places actually worth visiting — sorted by distance, with the real transit hubs to reach them. Preview any city without turning on location.</p>
-      </div>
-      <div class="card" id="plan">
-        <span class="label">Plan</span>
-        <svg class="pin" width="22" height="22" viewBox="0 0 24 24"><path fill="currentColor" d="M4 5h16v2H4Zm0 6h10v2H4Zm0 6h16v2H4Z"/></svg>
-        <h3>A trip that plans the walking for you</h3>
-        <p>Add your stops and WHRNXT chains them into the shortest sensible day. Then it hands you a share link — friends open the exact plan, no account and no app-store detour.</p>
-      </div>
-      <div class="card" id="transit">
-        <span class="label">Transit</span>
-        <svg class="pin" width="22" height="22" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2c-4 0-8 .5-8 4v9.5A2.5 2.5 0 0 0 6.5 18L5 19.5V20h2l2-2h6l2 2h2v-.5L17.5 18A2.5 2.5 0 0 0 20 15.5V6c0-3.5-4-4-8-4ZM7.5 17A1.5 1.5 0 1 1 9 15.5 1.5 1.5 0 0 1 7.5 17Zm9 0a1.5 1.5 0 1 1 1.5-1.5 1.5 1.5 0 0 1-1.5 1.5ZM18 11H6V6h12Z"/></svg>
-        <h3>Airports &amp; stations, sorted</h3>
-        <p>Every city shows its real transit. Tap "nearby cities' transit" and WHRNXT pulls in the airports and stations within reach — deduped and nearest-first, so you see one Newark, not eighteen.</p>
-      </div>
-      <div class="card">
-        <span class="label">Offline</span>
-        <svg class="pin" width="22" height="22" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9 9 9 0 0 0-9-9Zm6.7 7H14.4A9.9 9.9 0 0 0 12.9 5.1 7 7 0 0 1 18.7 10ZM12 5a9.9 9.9 0 0 1 1.5 5h-3A9.9 9.9 0 0 1 12 5ZM5.3 10a7 7 0 0 1 4.1-4.4A11.7 11.7 0 0 0 8 10Zm0 4H8a11.7 11.7 0 0 0 1.4 4.4A7 7 0 0 1 5.3 14ZM12 19a9.9 9.9 0 0 1-1.5-3.5h3A9.9 9.9 0 0 1 12 19Zm-1.9-5.5a13 13 0 0 1 0-3h3.8a13 13 0 0 1 0 3Zm4.5 3.9A11.7 11.7 0 0 0 16 14h2.7a7 7 0 0 1-4.1 4.4Z"/></svg>
-        <h3>Works with no signal</h3>
-        <p>WHRNXT runs in your browser and keeps working on the plane, underground, or abroad without data. Nothing to install, no sign-up, and it's free.</p>
-      </div>
-    </div>
-  </div></section>
-
-  <section class="block" id="share" style="padding-top:0"><div class="wrap"><div class="split">
+  <section class="block" id="share"><div class="wrap"><div class="split">
     <div class="panel-lg">
       <span class="label">Community</span>
-      <h2>Made a good trip? Share it.</h2>
+      <h2>Made a trip? Share it.</h2>
       <p>Post a WHRNXT share link (or any trip link). No account needed.</p>
       <form id="trip-form" novalidate>
         <p hidden><label>Leave blank: <input name="website" tabindex="-1" autocomplete="off"></label></p>
@@ -96,7 +63,7 @@ layout: base.njk
       <p class="fine" id="trip-msg">Your trip is held for review and goes live once approved &mdash; no spam, no junk links.</p>
       <a class="browse" href="/trips/">Browse shared trips &#9656;</a>
     </div>
-    <div class="panel-lg">
+    <div class="panel-lg" id="how">
       <span class="label">How to use it</span>
       <h2>Four modes, one app.</h2>
       <p>WHRNXT works differently depending on what you're doing — standing somewhere, planning ahead, or following a route you already built. Pick a mode to see how it works.</p>
