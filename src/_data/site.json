@@ -1,10 +1,9 @@
 {
   "name": "WHRNXT",
   "tagline": "sights, food & transit for 2,900+ cities",
-  "description": "WHRNXT turns any city into a plan you can follow — sights, food, and transit across 2,900+ cities (73,000+ places), with a trip planner you can share. Free, saved on your phone, private & offline, no login.",
+  "description": "WHRNXT will show you where the nearest sight is to you now or sorted by distance in your language, or allows you to create a plan before you go — sights, food, and transit across 2,900+ cities (73,000+ places) These trips can be shared with others and are free, saved on your phone, private & offline, no login.",
   "url": "https://whrnxt.net",
   "appUrl": "https://app.whrnxt.net",
   "apiUrl": "https://api-production-9f8f.up.railway.app",
   "email": "support@whrnxt.net"
 }
-
