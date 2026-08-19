@@ -32,8 +32,8 @@ collections:
       - { label: "Body", name: "body", widget: "markdown" }
 
   # Shared trips are NOT edited here — submissions land in the API as 'pending'
-  # and are approved in whrbot (Trips page). Keeping a copy in the CMS would mean
-  # two sources of truth for the same list.
+  # and are approved at https://whrnxt.net/review/ (paste the API's ADMIN_TOKEN).
+  # Keeping a copy in the CMS would mean two sources of truth for the same list.
 
   - name: "settings"
     label: "Site settings"

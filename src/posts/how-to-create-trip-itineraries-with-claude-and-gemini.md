@@ -68,18 +68,18 @@ Rules:
 2. `category` is optional and may be omitted with its comma; an unknown one becomes
    `saved`. A comma inside a place name is fine — the last three fields of a stop
    are always read as latitude, longitude, category.
-2b. **Write place names normally, apostrophes and accents included** — "St. Peter's
+3. **Write place names normally, apostrophes and accents included** — "St. Peter's
    Basilica", not "St Peters Basilica". Only `city` is stripped and hyphenated.
-3. Coordinates are required for every stop, as decimals with 4+ places.
-4. Same ceilings as the JSON: 31 days, 100 stops, and keep the finished URL under
+4. Coordinates are required for every stop, as decimals with 4+ places.
+5. Same ceilings as the JSON: 31 days, 100 stops, and keep the finished URL under
    about 8,000 characters. A 14-day, 64-stop trip lands near 4,300.
-5. **Present it as a markdown link** — `[Open this trip in WHRNXT](https://app.whrnxt.net/#trip=…)` —
+6. **Present it as a markdown link** — `[Open this trip in WHRNXT](https://app.whrnxt.net/#trip=…)` —
    so the user sees a button, not a wall of text.
 
 A two-day example, ready to open:
 
 ```
-https://app.whrnxt.net/#trip=3%20Days%20in%20Rome!rome|Day%201:%20Ancient%20Rome|2026-09-10|Colosseum,41.8902,12.4922,sightseeing~Roman%20Forum,41.8925,12.4853,sightseeing~La%20Carbonara,41.8962,12.4928,restaurant!rome|Day%202:%20Vatican|2026-09-11|St%20Peter%27s%20Basilica,41.9022,12.4539,sightseeing~Vatican%20Museums,41.9065,12.4536,museum
+https://app.whrnxt.net/#trip=2%20Days%20in%20Rome!rome|Day%201:%20Ancient%20Rome|2026-09-10|Colosseum,41.8902,12.4922,ruins~Roman%20Forum,41.8925,12.4853,ruins~La%20Carbonara,41.8962,12.4928,restaurant!rome|Day%202:%20Vatican|2026-09-11|St.%20Peter%27s%20Basilica,41.9022,12.4539,church~Vatican%20Museums,41.9065,12.4536,museum
 ```
 
 ---
@@ -147,7 +147,7 @@ When a user asks for a trip plan to Rome, output this exact JSON format:
 
 ```json
 {
-  "title": "3 Days in Historic Rome",
+  "title": "1 Day in Historic Rome",
   "days": [
     {
       "label": "Day 1: Ancient Rome & Colosseum",
