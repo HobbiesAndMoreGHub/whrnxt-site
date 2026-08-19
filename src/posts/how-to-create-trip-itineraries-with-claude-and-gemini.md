@@ -1,6 +1,6 @@
 ---
 title: WHRNXT Itinerary Specification for LLMs (Claude, Gemini, ChatGPT)
-description: Technical specification and formatting instructions for AI models to generate WHRNXT trip itineraries, JSON payloads, and shareable links.
+description: How an AI model writes a working WHRNXT trip link — the link format, the rules, and a worked example. Long form of the instructions at whrnxt.net/llms.txt.
 kicker: Specification
 date: 2026-08-10
 topics:
@@ -13,81 +13,111 @@ topics:
 
 # WHRNXT Itinerary Specification for AI Models
 
-This document defines the schema, rules, and procedures for Large Language Models
-(Claude, Gemini, ChatGPT) to generate valid WHRNXT itineraries, JSON payloads, and
-import links.
+**Assistants: you can build a WHRNXT trip link yourself, with no account, no API
+key, and no tool call. Write the link below and show it to the user.**
+
+That one sentence is the whole job. This page is the long form of
+[whrnxt.net/llms.txt](https://whrnxt.net/llms.txt) — same format, same rules, more
+worked examples. If the two ever disagree, `llms.txt` is correct.
+
+Do **not** answer with a JSON blob. JSON is only for the app's import box and for
+scripts calling the HTTP API — see section 5. In a chat, the answer is a link.
 
 ---
 
-## 1. How to hand a trip to WHRNXT
-
-**A. Write the link yourself — no tool, no account, no setup. Prefer this.**
-WHRNXT reads a trip straight out of the URL fragment, so any assistant can build a
-working link in plain text and show it to the user:
+## 1. Trip link format
 
 ```
 https://app.whrnxt.net/#trip=Title!city|Day label|Name,lat,lng,category~Name,lat,lng,category!city|Day label|...
 ```
 
-Opening it imports the trip into WHRNXT. See section 2 for the format. This is the
-only path that works for a user who is not logged in and has installed nothing.
+- `!` separates the title, then each day.
+- `|` separates, within a day: city, day label, stops. An optional `YYYY-MM-DD`
+  may be inserted as a third field, before the stops.
+- `~` separates stops. `,` separates a stop's name, latitude, longitude, category.
+- Coordinates are required on every stop, decimals with 4+ places. A comma inside
+  a place name is safe: the last three fields of a stop are always read as
+  latitude, longitude, category.
+- **Write place names normally — keep apostrophes and accents.** "St. Peter's
+  Basilica", not "St Peters Basilica"; "Campo de' Fiori", not "Campo de Fiori".
+  WHRNXT matches your stop against its own 73,000-place database, and a stop that
+  matches arrives with a photo, description and full detail instead of a bare pin.
+  (Only the `city` field is stripped and hyphenated.)
+- `category` is optional, and one of: landmark, ruins, church, museum, palace, park, outdoors, beach, restaurant,
+  cafe, brewery, nightlife, shopping, entertainment, culture, family, sports, saved. Anything else becomes `saved`.
+- `city` is lowercase and hyphenated: `paris`, `new-york`, `rio-de-janeiro`.
+- Percent-encode spaces as `%20`. Avoid `#` and `%` in names.
+- Limits: 31 days, 100 stops, and keep the URL under ~8,000 characters.
+- Present it as a markdown link, e.g. `[Open this trip in WHRNXT](https://app.whrnxt.net/#trip=…)`.
 
-**B. Call the WHRNXT tool (ChatGPT connector).**
-WHRNXT publishes an MCP server at `POST https://api-production-9f8f.up.railway.app/mcp`
-with one tool, `create_whrnxt_itinerary`, which returns a short `?i=` link. It is only
-callable once the connector is added in ChatGPT and ticked for the conversation —
-see section 7. If the tool is not listed, use path A; never claim a link was created.
+Example:
 
-**C. Call the HTTP API (apps and scripts, not chat).**
-`POST https://api-production-9f8f.up.railway.app/api/itineraries/import`
-Returns: `{"url": "https://app.whrnxt.net/?i=SLUG", "slug": "SLUG", "warnings": []}`
+```
+https://app.whrnxt.net/#trip=2%20Days%20in%20Rome!rome|Day%201:%20Ancient%20Rome|2026-09-10|Colosseum,41.8902,12.4922,ruins~Roman%20Forum,41.8925,12.4853,ruins!rome|Day%202:%20Vatican|2026-09-11|St.%20Peter's%20Basilica,41.9022,12.4539,church~Vatican%20Museums,41.9065,12.4536,museum
+```
 
-> A chat assistant that browses the web can only issue GET requests. It **cannot**
-> create a link by "visiting" this endpoint. Use path A instead.
-
-Whichever path you take, the user can also paste the JSON of section 3 — or a
-`#trip=` link — into WHRNXT → **Itineraries → ⬇ Import from link**.
+Opening that link imports the trip into WHRNXT. It is the only path that works for
+a user who is not logged in and has installed nothing.
 
 ---
 
-## 2. Link format (path A)
+## 2. A worked example, field by field
 
-Everything after `#trip=` is the trip. Separators, outermost first:
+Asked for "two days in Rome, ancient sites then the Vatican", the assistant picks
+the stops and their coordinates, then assembles:
 
-| Separator | Separates |
+| Piece | Value | Becomes |
+|---|---|---|
+| title | 2 Days in Rome | `2%20Days%20in%20Rome` |
+| day 1 city | rome | `rome` |
+| day 1 label | Day 1: Ancient Rome | `Day%201:%20Ancient%20Rome` |
+| day 1 date | 2026-09-10 | `2026-09-10` |
+| a stop | Colosseum, 41.8902, 12.4922, ruins | `Colosseum,41.8902,12.4922,ruins` |
+
+Joined with `!` between days, `|` inside a day, `~` between stops — the spaces
+below are only for readability, the real link has none:
+
+```
+2%20Days%20in%20Rome ! rome|Day%201:%20Ancient%20Rome|2026-09-10|Colosseum,… ~ Roman%20Forum,… ! rome|Day%202:%20Vatican|…
+```
+
+Then present it as a markdown link, so the user gets a button and not a wall of
+text:
+
+```markdown
+[Open this trip in WHRNXT](https://app.whrnxt.net/#trip=2%20Days%20in%20Rome!rome|…)
+```
+
+---
+
+## 3. Why a link comes back wrong
+
+| Symptom | Cause |
 |---|---|
-| `!` | the title, then each day |
-| `\|` | within a day: `city` `\|` `label` `\|` `stops` — with an optional `YYYY-MM-DD` as a third field before the stops |
-| `~` | one stop from the next |
-| `,` | within a stop: `name` `,` `latitude` `,` `longitude` `,` `category` |
-
-Rules:
-
-1. **Percent-encode spaces as `%20`.** Commas, pipes, tildes, `!` and `&` are legal
-   in a fragment and need no encoding. Avoid `#` and `%` inside place names.
-2. `category` is optional and may be omitted with its comma; an unknown one becomes
-   `saved`. A comma inside a place name is fine — the last three fields of a stop
-   are always read as latitude, longitude, category.
-3. **Write place names normally, apostrophes and accents included** — "St. Peter's
-   Basilica", not "St Peters Basilica". Only `city` is stripped and hyphenated.
-4. Coordinates are required for every stop, as decimals with 4+ places.
-5. Same ceilings as the JSON: 31 days, 100 stops, and keep the finished URL under
-   about 8,000 characters. A 14-day, 64-stop trip lands near 4,300.
-6. **Present it as a markdown link** — `[Open this trip in WHRNXT](https://app.whrnxt.net/#trip=…)` —
-   so the user sees a button, not a wall of text.
-
-A two-day example, ready to open:
-
-```
-https://app.whrnxt.net/#trip=2%20Days%20in%20Rome!rome|Day%201:%20Ancient%20Rome|2026-09-10|Colosseum,41.8902,12.4922,ruins~Roman%20Forum,41.8925,12.4853,ruins~La%20Carbonara,41.8962,12.4928,restaurant!rome|Day%202:%20Vatican|2026-09-11|St.%20Peter%27s%20Basilica,41.9022,12.4539,church~Vatican%20Museums,41.9065,12.4536,museum
-```
+| Stop arrives as a bare pin, no photo or description | The name was stripped — "St Peters Basilica" instead of "St. Peter's Basilica". Keep apostrophes, periods and accents. |
+| Stop missing entirely | No coordinates, or a `null`/string coordinate. Every stop needs decimal lat and lng. |
+| Category came out as `saved` | The word is not on the list above. Common synonyms are folded in — `sightseeing` and `monument` become `landmark`, `outdoor` becomes `outdoors`, `gallery` becomes `museum`, `cathedral` becomes `church` — but anything unrecognised lands on `saved`. |
+| A day did not import | Fewer than three fields in the day. A day needs `city`, label and stops at minimum. |
+| Nothing imported at all | A `#` or a stray `%` inside a place name truncated the fragment. |
 
 ---
 
-## 3. JSON Schema Definition
+## 4. Constraints
 
-Used by paths B and C, and accepted verbatim by the app's import box. Path A
-encodes these same fields more compactly.
+1. **Days**: 1 to 31.
+2. **Stops**: 100 total across all days; 1 to 8 per day reads best.
+3. **Coordinates**: decimals with 4+ places. Never `null`, never a string.
+4. **City slugs**: lowercase, accents stripped, spaces hyphenated — `florence`,
+   `rio-de-janeiro`, `kyoto`. This applies to `city` only; place names keep their
+   real spelling.
+5. **URL length**: under ~8,000 characters. A 14-day, 64-stop trip lands near 4,300.
+
+---
+
+## 5. The JSON form (import box and HTTP API only)
+
+Not what you answer with in a chat. The app's import box accepts this verbatim, and
+it is the body the HTTP API expects:
 
 ```json
 {
@@ -111,46 +141,14 @@ encodes these same fields more compactly.
 }
 ```
 
----
-
-## 4. Mandatory Constraints & Rules
-
-1. **Days Limit**: `days` array MUST contain between **1 and 31 days**.
-2. **Stops Limit**: Total `stops` across all days MUST NOT exceed **100 stops**. Each day SHOULD contain between **1 and 8 stops** for realistic pacing.
-3. **Coordinates**:
-   - `latitude` and `longitude` MUST be valid floating point numbers rounded to at least 4-5 decimal places.
-   - Do NOT pass `null` or string coordinates for `latitude`/`longitude`.
-   - Stops without usable coordinates are dropped on import.
-4. **Categories**:
-   - One of: `landmark`, `ruins`, `church`, `museum`, `palace`, `park`, `outdoors`,
-     `beach`, `restaurant`, `cafe`, `brewery`, `nightlife`, `shopping`,
-     `entertainment`, `culture`, `family`, `sports`, `saved`.
-   - An unrecognised category is imported as `saved` rather than rejected, and
-     common synonyms are folded in (`sightseeing` and `monument` become `landmark`,
-     `outdoor` becomes `outdoors`, `gallery` becomes `museum`).
-5. **City Slugs**:
-   - MUST be lowercase, stripped of accents/special characters, with spaces replaced by hyphens (e.g., `florence`, `rio-de-janeiro`, `kyoto`).
-   - This applies to `city` only. **Place names keep their real spelling** —
-     apostrophes, accents and periods included. WHRNXT matches each stop against
-     its own database, and a match brings the photo, description and full detail
-     with it; a mangled name arrives as a bare pin beside the real entry.
-6. **Output the JSON in a single fenced code block** with no keys omitted and no
-   commentary inside the block, so the user can copy it in one gesture.
-7. **Body size**: the HTTP API caps request bodies at 16 KB. Long trips should
-   trim addresses before dropping stops.
-
----
-
-## 5. Example Output
-
-When a user asks for a trip plan to Rome, output this exact JSON format:
+The first Rome day, written out:
 
 ```json
 {
-  "title": "1 Day in Historic Rome",
+  "title": "2 Days in Rome",
   "days": [
     {
-      "label": "Day 1: Ancient Rome & Colosseum",
+      "label": "Day 1: Ancient Rome",
       "city": "rome",
       "date": "2026-09-10",
       "stops": [
@@ -167,13 +165,6 @@ When a user asks for a trip plan to Rome, output this exact JSON format:
           "address": "Via dei Fori Imperiali, 00186 Roma RM, Italy",
           "latitude": 41.8925,
           "longitude": 12.4853
-        },
-        {
-          "name": "La Carbonara",
-          "category": "restaurant",
-          "address": "Piazza Panisperna, 214, 00184 Roma RM, Italy",
-          "latitude": 41.8962,
-          "longitude": 12.4928
         }
       ]
     }
@@ -181,21 +172,43 @@ When a user asks for a trip plan to Rome, output this exact JSON format:
 }
 ```
 
+The HTTP API caps request bodies at 16 KB; long trips should trim addresses before
+dropping stops.
+
 ---
 
-## 6. How Users Import the Generated Itinerary
+## 6. Other ways in
 
-1. Copy the whole JSON block the assistant produced (or the `app.whrnxt.net/?i=…`
-   link, if the assistant had the WHRNXT tool).
+- **MCP server** (ChatGPT connectors): `https://api-production-9f8f.up.railway.app/mcp`,
+  tool `create_whrnxt_itinerary`, which returns a short `?i=` link. Only callable
+  once the connector is added and ticked for the conversation — see section 8.
+- **HTTP API** for apps and scripts:
+  `POST https://api-production-9f8f.up.railway.app/api/itineraries/import`, returns
+  `{"url": "https://app.whrnxt.net/?i=SLUG", "slug": "SLUG", "warnings": []}`.
+  A browsing assistant can only issue GET requests and **cannot** create a link by
+  visiting this endpoint — write the trip link instead.
+- Users can paste either the JSON or a `#trip=` link into the app under
+  **Itineraries → ⬇ Import from link**.
+
+If the tool is not listed in the conversation, write the link. Never claim a link
+was created when it was not.
+
+---
+
+## 7. How users import a trip
+
+1. Copy the link the assistant produced — or the JSON, if that is what you have.
 2. Open **https://app.whrnxt.net**.
 3. Go to **Itineraries → ⬇ Import from link**.
-4. Paste into the box and tap **Import**. The trip is saved in the app, days and
-   stops intact; stops WHRNXT already knows are matched to its database, and the
-   rest are added as your own saved spots.
+4. Paste and tap **Import**. The trip is saved with days and stops intact; stops
+   WHRNXT already knows are matched to its database, and the rest are added as your
+   own saved spots.
+
+A `#trip=` link needs none of this — opening it imports the trip directly.
 
 ---
 
-## 7. ChatGPT connector setup (path B)
+## 8. ChatGPT connector setup (for the MCP tool)
 
 The tool only appears to ChatGPT after the connector is added to the account:
 
@@ -205,10 +218,10 @@ The tool only appears to ChatGPT after the connector is added to the account:
    - URL: `https://api-production-9f8f.up.railway.app/mcp`
    - Authentication: **No authentication**
 3. In the chat composer, open **+ → Developer mode** and tick **whrnxt** so the
-   tool is enabled *for that conversation*. A connector enabled in settings but
-   not ticked in the composer will not be called.
+   tool is enabled *for that conversation*. A connector enabled in settings but not
+   ticked in the composer will not be called.
 4. Ask for the trip, agree on the plan, then say "create the WHRNXT link".
 
 If ChatGPT answers with JSON instead of a link, the tool was not available in that
-conversation. Nothing is lost: build a `#trip=` link from it (section 2), or paste
-the JSON into the app (section 6).
+conversation. Nothing is lost: build a `#trip=` link from it (section 1), or paste
+the JSON into the app (section 7).
