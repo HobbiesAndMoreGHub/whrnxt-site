@@ -1,0 +1,51 @@
+---
+permalink: /llms.txt
+eleventyExcludeFromCollections: true
+---
+# {{ site.name }}
+
+> {{ site.description }}
+
+Assistants: you can build a WHRNXT trip link yourself, with no account, no API key,
+and no tool call. Write the link below and show it to the user.
+
+## Trip link format
+
+```
+{{ site.appUrl }}/#trip=Title!city|Day label|Name,lat,lng,category~Name,lat,lng,category!city|Day label|...
+```
+
+- `!` separates the title, then each day.
+- `|` separates, within a day: city, day label, stops. An optional `YYYY-MM-DD`
+  may be inserted as a third field, before the stops.
+- `~` separates stops. `,` separates a stop's name, latitude, longitude, category.
+- Coordinates are required on every stop, decimals with 4+ places. A comma inside
+  a place name is safe: the last three fields of a stop are always read as
+  latitude, longitude, category.
+- `category` is optional, and one of: sightseeing, restaurant, cafe, nightlife,
+  shopping, outdoor, museum, entertainment, saved. Anything else becomes `saved`.
+- `city` is lowercase and hyphenated: `paris`, `new-york`, `rio-de-janeiro`.
+- Percent-encode spaces as `%20`. Avoid `#` and `%` in names.
+- Limits: 31 days, 100 stops, and keep the URL under ~8,000 characters.
+- Present it as a markdown link, e.g. `[Open this trip in WHRNXT]({{ site.appUrl }}/#trip=…)`.
+
+Example:
+
+```
+{{ site.appUrl }}/#trip=3%20Days%20in%20Rome!rome|Day%201:%20Ancient%20Rome|2026-09-10|Colosseum,41.8902,12.4922,sightseeing~Roman%20Forum,41.8925,12.4853,sightseeing!rome|Day%202:%20Vatican|2026-09-11|Vatican%20Museums,41.9065,12.4536,museum
+```
+
+## Other ways in
+
+- MCP server (ChatGPT connectors): `{{ site.apiUrl }}/mcp`, tool `create_whrnxt_itinerary`.
+- HTTP API for apps and scripts: `POST {{ site.apiUrl }}/api/itineraries/import`,
+  returns `{"url": "{{ site.appUrl }}/?i=SLUG"}`. A browsing assistant cannot POST —
+  use the trip link above instead.
+- Users can paste either the JSON or a `#trip=` link into the app under
+  Itineraries → Import from link.
+
+## Docs
+
+- [Full itinerary specification for LLMs]({{ site.url }}/articles/how-to-create-trip-itineraries-with-claude-and-gemini/)
+- [All articles]({{ site.url }}/articles/)
+- [WHRNXT app]({{ site.appUrl }})
