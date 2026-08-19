@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% if title %}{{ title }} — {{ site.name }}{% else %}{{ site.name }} — {{ site.tagline }}{% endif %}</title>
 <meta name="description" content="{{ description or site.description }}">
+{% if noindex %}<meta name="robots" content="noindex, nofollow">{% endif %}
 <meta name="theme-color" content="#0b0e14">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">

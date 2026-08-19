@@ -6,8 +6,8 @@ eleventyExcludeFromCollections: true
 #
 # Everything public here is open to search engines and to AI/LLM crawlers:
 # read it, index it, quote it, cite it. The only closed doors are the CMS
-# admin panel, the Netlify function endpoints, and the form thank-you page,
-# none of which are content.
+# admin panel, the trip review queue, the Netlify function endpoints, and the
+# form thank-you page, none of which are content.
 #
 # Note on groups: a crawler obeys ONLY the most specific group that names it
 # and ignores every other group, so each group below repeats the same rules.
@@ -17,6 +17,7 @@ eleventyExcludeFromCollections: true
 User-agent: *
 Allow: /
 Disallow: /admin/
+Disallow: /review/
 Disallow: /thanks/
 Disallow: /.netlify/
 
@@ -31,6 +32,7 @@ User-agent: Baiduspider
 User-agent: YandexBot
 Allow: /
 Disallow: /admin/
+Disallow: /review/
 Disallow: /thanks/
 Disallow: /.netlify/
 
@@ -59,6 +61,7 @@ User-agent: YouBot
 User-agent: CCBot
 Allow: /
 Disallow: /admin/
+Disallow: /review/
 Disallow: /thanks/
 Disallow: /.netlify/
 

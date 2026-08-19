@@ -1,0 +1,275 @@
+---
+layout: base.njk
+title: Review queue
+permalink: /review/index.html
+description: Moderation queue for community-submitted trips.
+sitemap: false
+noindex: true
+---
+<section class="block"><div class="wrap">
+  <div class="sec-head">
+    <span class="label">Moderation</span>
+    <h2>Review queue</h2>
+    <p>Trips people submitted from the front page. Nothing here is public until you approve it &mdash; approving puts it straight on the <a class="browse" href="/trips/">Shared trips</a> page.</p>
+  </div>
+
+  <form id="gate" class="rv-gate" hidden>
+    <label class="f" for="rv-token">Admin token</label>
+    <input id="rv-token" type="password" autocomplete="current-password" placeholder="Paste the ADMIN_TOKEN set on the API" required>
+    <button class="btn btn-signal" type="submit" style="align-self:flex-start">Open queue &#9656;</button>
+    <p class="fine">Held for this browser tab only, and never sent anywhere but the WHRNXT API. Closing the tab forgets it.</p>
+  </form>
+
+  <div id="board" hidden>
+    <div class="rv-bar">
+      <div class="rv-tabs" role="tablist">
+        <button class="mode-tab is-on" type="button" role="tab" data-status="pending">Pending</button>
+        <button class="mode-tab" type="button" role="tab" data-status="approved">Approved</button>
+        <button class="mode-tab" type="button" role="tab" data-status="rejected">Rejected</button>
+      </div>
+      <div class="rv-bar-end">
+        <span class="label" id="rv-count"></span>
+        <button class="btn btn-ghost" type="button" id="rv-refresh">Refresh</button>
+        <button class="btn btn-ghost" type="button" id="rv-forget">Forget token</button>
+      </div>
+    </div>
+
+    <p class="rv-msg" id="rv-msg" role="status" aria-live="polite"></p>
+    <div class="trip-list" id="rv-list"></div>
+  </div>
+</div></section>
+
+{% raw %}<script>
+(function(){
+  var API = {% endraw %}{{ site.apiUrl | dump | safe }}{% raw %};
+  var KEY = 'whrnxtAdminToken';
+
+  var gate    = document.getElementById('gate');
+  var tokenIn = document.getElementById('rv-token');
+  var board   = document.getElementById('board');
+  var list    = document.getElementById('rv-list');
+  var msg     = document.getElementById('rv-msg');
+  var countEl = document.getElementById('rv-count');
+  var tabs    = Array.prototype.slice.call(document.querySelectorAll('.rv-tabs .mode-tab'));
+
+  var token  = sessionStorage.getItem(KEY) || '';
+  var status = 'pending';
+  var busy   = false;
+
+  function say(text, kind){
+    msg.textContent = text || '';
+    msg.className = 'rv-msg' + (kind ? ' is-' + kind : '');
+  }
+
+  function showGate(){
+    board.hidden = true;
+    gate.hidden = false;
+    tokenIn.focus();
+  }
+
+  function showBoard(){
+    gate.hidden = true;
+    board.hidden = false;
+  }
+
+  // Submissions are stranger-typed. Every value goes in as text, and a link is
+  // only ever hrefed if it really is http(s) — the server stores https only,
+  // but the page should not depend on that to stay safe.
+  function safeHref(raw){
+    try {
+      var u = new URL(String(raw));
+      return (u.protocol === 'https:' || u.protocol === 'http:') ? u.toString() : null;
+    } catch (e) { return null; }
+  }
+
+  function when(iso){
+    if(!iso) return '';
+    var d = new Date(iso);
+    if(isNaN(d)) return '';
+    return d.toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
+  }
+
+  function card(t){
+    var el = document.createElement('article');
+    el.className = 'trip-card rv-card';
+
+    if(t.cities){
+      var c = document.createElement('span');
+      c.className = 'label';
+      c.textContent = t.cities;
+      el.appendChild(c);
+    }
+
+    var h = document.createElement('h3');
+    h.textContent = t.title;
+    el.appendChild(h);
+
+    if(t.note){
+      var p = document.createElement('p');
+      p.textContent = t.note;
+      el.appendChild(p);
+    }
+
+    var href = safeHref(t.link);
+    var linkRow = document.createElement('p');
+    linkRow.className = 'rv-link mono';
+    if(href){
+      var a = document.createElement('a');
+      a.href = href;
+      a.target = '_blank';
+      a.rel = 'nofollow noopener noreferrer';
+      a.textContent = href;
+      linkRow.appendChild(a);
+    } else {
+      linkRow.textContent = String(t.link || '') + '  (not a usable link)';
+      linkRow.classList.add('is-bad');
+    }
+    el.appendChild(linkRow);
+
+    var meta = document.createElement('p');
+    meta.className = 'rv-meta';
+    meta.textContent = 'Submitted ' + when(t.created_at) + '  ·  id ' + t.id;
+    el.appendChild(meta);
+
+    var actions = document.createElement('div');
+    actions.className = 'rv-actions';
+
+    if(status !== 'approved'){
+      var ok = document.createElement('button');
+      ok.className = 'btn btn-signal';
+      ok.type = 'button';
+      ok.textContent = 'Approve';
+      ok.addEventListener('click', function(){ moderate(t.id, 'approved', el, ok); });
+      actions.appendChild(ok);
+    }
+
+    if(status !== 'rejected'){
+      var no = document.createElement('button');
+      no.className = 'btn btn-ghost';
+      no.type = 'button';
+      no.textContent = status === 'approved' ? 'Take down' : 'Reject';
+      no.addEventListener('click', function(){ moderate(t.id, 'rejected', el, no); });
+      actions.appendChild(no);
+    }
+
+    el.appendChild(actions);
+    return el;
+  }
+
+  function empty(text){
+    var e = document.createElement('div');
+    e.className = 'trip-empty';
+    var p = document.createElement('p');
+    p.textContent = text;
+    e.appendChild(p);
+    return e;
+  }
+
+  function load(){
+    if(busy) return;
+    busy = true;
+    say('Loading…');
+
+    fetch(API + '/api/trips/queue?status=' + encodeURIComponent(status), {
+      headers: { 'X-Admin-Token': token },
+    })
+    .then(function(r){
+      if(r.status === 401){
+        var err = new Error('That token was not accepted. Check ADMIN_TOKEN on the API.');
+        err.unauthorized = true;
+        throw err;
+      }
+      if(!r.ok) throw new Error('The server returned ' + r.status + '.');
+      return r.json();
+    })
+    .then(function(d){
+      var trips = (d && d.trips) || [];
+      sessionStorage.setItem(KEY, token);
+      showBoard();
+      list.replaceChildren();
+      countEl.textContent = trips.length === 1 ? '1 trip' : trips.length + ' trips';
+
+      if(!trips.length){
+        list.appendChild(empty(
+          status === 'pending'
+            ? 'Nothing waiting. Submitted trips land here for review.'
+            : 'No ' + status + ' trips.'
+        ));
+      } else {
+        trips.forEach(function(t){ list.appendChild(card(t)); });
+      }
+      say('');
+    })
+    .catch(function(e){
+      say(e.message || 'Could not reach the server.', 'bad');
+      if(e.unauthorized){
+        sessionStorage.removeItem(KEY);
+        token = '';
+        showGate();
+      }
+    })
+    .then(function(){ busy = false; });
+  }
+
+  function moderate(id, next, el, btn){
+    var buttons = el.querySelectorAll('button');
+    Array.prototype.forEach.call(buttons, function(b){ b.disabled = true; });
+    btn.textContent = next === 'approved' ? 'Approving…' : 'Rejecting…';
+
+    fetch(API + '/api/trips/' + encodeURIComponent(id) + '/moderate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+      body: JSON.stringify({ status: next }),
+    })
+    .then(function(r){
+      if(r.status === 401) throw new Error('Token rejected — reload and sign in again.');
+      if(!r.ok) throw new Error('The server returned ' + r.status + '.');
+      return r.json();
+    })
+    .then(function(){
+      el.classList.add('is-gone');
+      say(next === 'approved' ? 'Approved — it is live on /trips/ now.' : 'Rejected.', 'good');
+      setTimeout(function(){
+        el.remove();
+        var left = list.querySelectorAll('.rv-card').length;
+        countEl.textContent = left === 1 ? '1 trip' : left + ' trips';
+        if(!left) load();
+      }, 260);
+    })
+    .catch(function(e){
+      say(e.message, 'bad');
+      Array.prototype.forEach.call(buttons, function(b){ b.disabled = false; });
+      btn.textContent = next === 'approved' ? 'Approve' : 'Reject';
+    });
+  }
+
+  tabs.forEach(function(tab){
+    tab.addEventListener('click', function(){
+      tabs.forEach(function(t){ t.classList.remove('is-on'); });
+      tab.classList.add('is-on');
+      status = tab.dataset.status;
+      load();
+    });
+  });
+
+  document.getElementById('rv-refresh').addEventListener('click', load);
+
+  document.getElementById('rv-forget').addEventListener('click', function(){
+    sessionStorage.removeItem(KEY);
+    token = '';
+    tokenIn.value = '';
+    list.replaceChildren();
+    say('');
+    showGate();
+  });
+
+  gate.addEventListener('submit', function(e){
+    e.preventDefault();
+    token = tokenIn.value.trim();
+    if(!token){ say('Paste the admin token first.', 'bad'); return; }
+    load();
+  });
+
+  if(token) load(); else showGate();
+})();
+</script>{% endraw %}

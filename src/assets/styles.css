@@ -252,3 +252,21 @@ footer{border-top:1px solid var(--line);margin-top:24px;padding:40px 0 60px;colo
   border:1px solid var(--line);border-radius:5px;padding:2px 8px;text-decoration:none}
 a.chip:hover{border-color:var(--signal);color:var(--signal)}
 .article-tags{margin:14px 0 22px}
+
+/* review queue (/review/ — noindex, admin only) */
+.rv-gate{max-width:460px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px}
+.rv-bar{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;margin-bottom:22px}
+.rv-bar-end{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.rv-bar-end .btn{font-size:13px;padding:8px 14px}
+.rv-tabs{display:flex;flex-wrap:wrap;gap:8px}
+.rv-msg{min-height:22px;margin:0 0 18px;font-size:14px;color:var(--muted)}
+.rv-msg.is-good{color:var(--go)}
+.rv-msg.is-bad{color:#ff8f8f}
+.rv-card{transition:opacity .2s, transform .2s}
+.rv-card.is-gone{opacity:0;transform:translateY(-6px)}
+.rv-link{font-size:12.5px;word-break:break-all;margin:12px 0 6px}
+.rv-link a{color:var(--signal)}
+.rv-link.is-bad{color:#ff8f8f}
+.rv-meta{color:var(--muted);font-size:12.5px;margin:0 0 18px}
+.rv-actions{display:flex;gap:10px}
+.rv-actions .btn{font-size:14px;padding:9px 16px}
