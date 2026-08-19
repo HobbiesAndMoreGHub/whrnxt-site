@@ -68,6 +68,8 @@ Rules:
 2. `category` is optional and may be omitted with its comma; an unknown one becomes
    `saved`. A comma inside a place name is fine — the last three fields of a stop
    are always read as latitude, longitude, category.
+2b. **Write place names normally, apostrophes and accents included** — "St. Peter's
+   Basilica", not "St Peters Basilica". Only `city` is stripped and hyphenated.
 3. Coordinates are required for every stop, as decimals with 4+ places.
 4. Same ceilings as the JSON: 31 days, 100 stops, and keep the finished URL under
    about 8,000 characters. A 14-day, 64-stop trip lands near 4,300.
@@ -98,7 +100,7 @@ encodes these same fields more compactly.
       "stops": [
         {
           "name": "String (1-120 chars) - Name of the location or sight",
-          "category": "String - One of: sightseeing, restaurant, cafe, nightlife, shopping, outdoor, museum, entertainment, saved",
+          "category": "String - One of: landmark, ruins, church, museum, palace, park, outdoors, beach, restaurant, cafe, brewery, nightlife, shopping, entertainment, culture, family, sports, saved",
           "address": "String (optional) - Full address for geocoding fallback",
           "latitude": "Number (-90 to 90) - Decimal latitude (e.g. 48.8584)",
           "longitude": "Number (-180 to 180) - Decimal longitude (e.g. 2.2945)"
@@ -120,10 +122,18 @@ encodes these same fields more compactly.
    - Do NOT pass `null` or string coordinates for `latitude`/`longitude`.
    - Stops without usable coordinates are dropped on import.
 4. **Categories**:
-   - MUST be one of: `sightseeing`, `restaurant`, `cafe`, `nightlife`, `shopping`, `outdoor`, `museum`, `entertainment`, `saved`.
-   - An unrecognised category is imported as `saved` rather than rejected.
+   - One of: `landmark`, `ruins`, `church`, `museum`, `palace`, `park`, `outdoors`,
+     `beach`, `restaurant`, `cafe`, `brewery`, `nightlife`, `shopping`,
+     `entertainment`, `culture`, `family`, `sports`, `saved`.
+   - An unrecognised category is imported as `saved` rather than rejected, and
+     common synonyms are folded in (`sightseeing` and `monument` become `landmark`,
+     `outdoor` becomes `outdoors`, `gallery` becomes `museum`).
 5. **City Slugs**:
    - MUST be lowercase, stripped of accents/special characters, with spaces replaced by hyphens (e.g., `florence`, `rio-de-janeiro`, `kyoto`).
+   - This applies to `city` only. **Place names keep their real spelling** —
+     apostrophes, accents and periods included. WHRNXT matches each stop against
+     its own database, and a match brings the photo, description and full detail
+     with it; a mangled name arrives as a bare pin beside the real entry.
 6. **Output the JSON in a single fenced code block** with no keys omitted and no
    commentary inside the block, so the user can copy it in one gesture.
 7. **Body size**: the HTTP API caps request bodies at 16 KB. Long trips should
@@ -146,14 +156,14 @@ When a user asks for a trip plan to Rome, output this exact JSON format:
       "stops": [
         {
           "name": "Colosseum",
-          "category": "sightseeing",
+          "category": "ruins",
           "address": "Piazza del Colosseo, 1, 00184 Roma RM, Italy",
           "latitude": 41.8902,
           "longitude": 12.4922
         },
         {
           "name": "Roman Forum",
-          "category": "sightseeing",
+          "category": "ruins",
           "address": "Via dei Fori Imperiali, 00186 Roma RM, Italy",
           "latitude": 41.8925,
           "longitude": 12.4853

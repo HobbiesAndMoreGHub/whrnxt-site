@@ -22,8 +22,13 @@ and no tool call. Write the link below and show it to the user.
 - Coordinates are required on every stop, decimals with 4+ places. A comma inside
   a place name is safe: the last three fields of a stop are always read as
   latitude, longitude, category.
-- `category` is optional, and one of: sightseeing, restaurant, cafe, nightlife,
-  shopping, outdoor, museum, entertainment, saved. Anything else becomes `saved`.
+- **Write place names normally — keep apostrophes and accents.** "St. Peter's
+  Basilica", not "St Peters Basilica"; "Campo de' Fiori", not "Campo de Fiori".
+  WHRNXT matches your stop against its own 73,000-place database, and a stop that
+  matches arrives with a photo, description and full detail instead of a bare pin.
+  (Only the `city` field is stripped and hyphenated.)
+- `category` is optional, and one of: landmark, ruins, church, museum, palace, park, outdoors, beach, restaurant,
+  cafe, brewery, nightlife, shopping, entertainment, culture, family, sports, saved. Anything else becomes `saved`.
 - `city` is lowercase and hyphenated: `paris`, `new-york`, `rio-de-janeiro`.
 - Percent-encode spaces as `%20`. Avoid `#` and `%` in names.
 - Limits: 31 days, 100 stops, and keep the URL under ~8,000 characters.
@@ -32,7 +37,7 @@ and no tool call. Write the link below and show it to the user.
 Example:
 
 ```
-{{ site.appUrl }}/#trip=3%20Days%20in%20Rome!rome|Day%201:%20Ancient%20Rome|2026-09-10|Colosseum,41.8902,12.4922,sightseeing~Roman%20Forum,41.8925,12.4853,sightseeing!rome|Day%202:%20Vatican|2026-09-11|Vatican%20Museums,41.9065,12.4536,museum
+{{ site.appUrl }}/#trip=3%20Days%20in%20Rome!rome|Day%201:%20Ancient%20Rome|2026-09-10|Colosseum,41.8902,12.4922,ruins~Roman%20Forum,41.8925,12.4853,ruins!rome|Day%202:%20Vatican|2026-09-11|St.%20Peter's%20Basilica,41.9022,12.4539,church~Vatican%20Museums,41.9065,12.4536,museum
 ```
 
 ## Other ways in
