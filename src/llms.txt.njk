@@ -19,6 +19,9 @@ and no tool call. Write the link below and show it to the user.
 - `|` separates, within a day: city, day label, stops. An optional `YYYY-MM-DD`
   may be inserted as a third field, before the stops.
 - `~` separates stops. `,` separates a stop's name, latitude, longitude, category.
+- A stop may carry a **time**, appended to its name as `@HH:MM` or `@HH:MM-HH:MM`
+  in 24-hour form: `Colosseum@09:00-11:30,41.8902,12.4922,ruins`. Include one only
+  when the request or the source says when — never invent a schedule.
 - Coordinates are required on every stop, decimals with 4+ places. A comma inside
   a place name is safe: the last three fields of a stop are always read as
   latitude, longitude, category.
@@ -37,7 +40,7 @@ and no tool call. Write the link below and show it to the user.
 Example:
 
 ```
-{{ site.appUrl }}/#trip=2%20Days%20in%20Rome!rome|Day%201:%20Ancient%20Rome|2026-09-10|Colosseum,41.8902,12.4922,ruins~Roman%20Forum,41.8925,12.4853,ruins!rome|Day%202:%20Vatican|2026-09-11|St.%20Peter's%20Basilica,41.9022,12.4539,church~Vatican%20Museums,41.9065,12.4536,museum
+{{ site.appUrl }}/#trip=2%20Days%20in%20Rome!rome|Day%201:%20Ancient%20Rome|2026-09-10|Colosseum@09:00-11:30,41.8902,12.4922,ruins~Roman%20Forum@12:00,41.8925,12.4853,ruins!rome|Day%202:%20Vatican|2026-09-11|St.%20Peter's%20Basilica,41.9022,12.4539,church~Vatican%20Museums,41.9065,12.4536,museum
 ```
 
 ## Other ways in

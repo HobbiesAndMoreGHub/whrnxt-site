@@ -35,6 +35,9 @@ https://app.whrnxt.net/#trip=Title!city|Day label|Name,lat,lng,category~Name,lat
 - `|` separates, within a day: city, day label, stops. An optional `YYYY-MM-DD`
   may be inserted as a third field, before the stops.
 - `~` separates stops. `,` separates a stop's name, latitude, longitude, category.
+- A stop may carry a **time**, appended to its name as `@HH:MM` or `@HH:MM-HH:MM`
+  in 24-hour form: `Colosseum@09:00-11:30,41.8902,12.4922,ruins`. Include one only
+  when the request or the source says when — never invent a schedule.
 - Coordinates are required on every stop, decimals with 4+ places. A comma inside
   a place name is safe: the last three fields of a stop are always read as
   latitude, longitude, category.
@@ -53,7 +56,7 @@ https://app.whrnxt.net/#trip=Title!city|Day label|Name,lat,lng,category~Name,lat
 Example:
 
 ```
-https://app.whrnxt.net/#trip=2%20Days%20in%20Rome!rome|Day%201:%20Ancient%20Rome|2026-09-10|Colosseum,41.8902,12.4922,ruins~Roman%20Forum,41.8925,12.4853,ruins!rome|Day%202:%20Vatican|2026-09-11|St.%20Peter's%20Basilica,41.9022,12.4539,church~Vatican%20Museums,41.9065,12.4536,museum
+https://app.whrnxt.net/#trip=2%20Days%20in%20Rome!rome|Day%201:%20Ancient%20Rome|2026-09-10|Colosseum@09:00-11:30,41.8902,12.4922,ruins~Roman%20Forum@12:00,41.8925,12.4853,ruins!rome|Day%202:%20Vatican|2026-09-11|St.%20Peter's%20Basilica,41.9022,12.4539,church~Vatican%20Museums,41.9065,12.4536,museum
 ```
 
 Opening that link imports the trip into WHRNXT. It is the only path that works for
@@ -111,6 +114,8 @@ text:
    `rio-de-janeiro`, `kyoto`. This applies to `city` only; place names keep their
    real spelling.
 5. **URL length**: under ~8,000 characters. A 14-day, 64-stop trip lands near 4,300.
+6. **Times**: optional, 24-hour `HH:MM`. Set them only from times the request or
+   the source actually gives; a stop with no stated time carries none.
 
 ---
 
@@ -133,7 +138,9 @@ it is the body the HTTP API expects:
           "category": "String - One of: landmark, ruins, church, museum, palace, park, outdoors, beach, restaurant, cafe, brewery, nightlife, shopping, entertainment, culture, family, sports, saved",
           "address": "String (optional) - Full address for geocoding fallback",
           "latitude": "Number (-90 to 90) - Decimal latitude (e.g. 48.8584)",
-          "longitude": "Number (-180 to 180) - Decimal longitude (e.g. 2.2945)"
+          "longitude": "Number (-180 to 180) - Decimal longitude (e.g. 2.2945)",
+          "time": "String (optional) - Start time, 24-hour 'HH:MM'",
+          "endTime": "String (optional) - End time, 24-hour 'HH:MM', for a range"
         }
       ]
     }
