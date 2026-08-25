@@ -270,3 +270,14 @@ a.chip:hover{border-color:var(--signal);color:var(--signal)}
 .rv-meta{color:var(--muted);font-size:12.5px;margin:0 0 18px}
 .rv-actions{display:flex;gap:10px}
 .rv-actions .btn{font-size:14px;padding:9px 16px}
+
+/* Text-to-trip result + community place submission */
+.plan-ok{border:1px solid var(--signal);border-radius:12px;padding:16px;background:#0d1520}
+.plan-warn{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:12px;background:#0d131d}
+.plan-warn strong{display:block;margin-bottom:4px}
+.plan-list{margin:8px 0 0;padding-left:18px}
+.plan-list li{margin:3px 0;line-height:1.45}
+select{width:100%;background:#0d131d;border:1px solid var(--line);border-radius:10px;
+  color:var(--ink);padding:11px 12px;font:inherit}
+select:focus{outline:2px solid var(--signal);outline-offset:1px;border-color:var(--signal)}
+#p-url{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px}

@@ -1,0 +1,165 @@
+---
+layout: base.njk
+title: Add a place
+description: Know a sight WHRNXT is missing? Send us the city and the name — coordinates optional — and we'll check it and add it.
+permalink: /add-place/index.html
+---
+<section class="block"><div class="wrap">
+  <div class="sec-head">
+    <span class="label">Community</span>
+    <h2>Know somewhere we're missing?</h2>
+    <p>WHRNXT covers 2,900+ cities and 75,000+ places, and there are still gaps. Tell us the city and what the place is called — that's enough. If you happen to know the coordinates, they help, but nobody expects you to.</p>
+  </div>
+
+  {% if not site.turnstileSiteKey %}<div class="plan-warn" style="border-color:#b8860b;margin-bottom:16px">
+    <strong>Not live yet</strong>
+    <p class="fine">This form needs a Cloudflare Turnstile site key before it will work. Set <code>turnstileSiteKey</code> in <code>src/_data/site.json</code> and <code>TURNSTILE_SECRET</code> on the API. Until then the server refuses submissions on purpose.</p>
+  </div>{% endif %}
+
+  <div class="split">
+    <div class="panel-lg">
+      <form id="place-form" novalidate>
+        <p hidden><label>Leave blank: <input name="website" tabindex="-1" autocomplete="off"></label></p>
+
+        <div class="form-row">
+          <div>
+            <label class="f" for="pl-city">City</label>
+            <input id="pl-city" name="city" placeholder="Genoa" required maxlength="120">
+          </div>
+          <div>
+            <label class="f" for="pl-cat">Kind of place <span class="fine">(optional)</span></label>
+            <select id="pl-cat" name="category">
+              <option value="">—</option>
+              <option>landmark</option><option>museum</option><option>church</option>
+              <option>park</option><option>outdoors</option><option>beach</option>
+              <option>culture</option><option>ruins</option><option>palace</option>
+              <option>entertainment</option><option>family</option><option>shopping</option>
+              <option>sports</option><option>restaurant</option><option>cafe</option>
+              <option>brewery</option><option>nightlife</option>
+            </select>
+          </div>
+        </div>
+
+        <label class="f" for="pl-name" style="margin-top:12px">Name of the sight or place</label>
+        <input id="pl-name" name="name" placeholder="Palazzo Reale di Genova" required maxlength="160">
+
+        <p class="f" style="margin-top:16px;margin-bottom:2px">Satellite coordinates <span class="fine">— optional, leave blank if you don't know them</span></p>
+        <div class="form-row">
+          <div><label class="f fine" for="pl-lat">Latitude</label><input id="pl-lat" name="lat" inputmode="decimal" placeholder="44.4118"></div>
+          <div><label class="f fine" for="pl-lng">Longitude</label><input id="pl-lng" name="lng" inputmode="decimal" placeholder="8.9298"></div>
+        </div>
+        <p class="fine">In Google Maps, right-click the spot and the first line of the menu is the pair — click it to copy, then paste either half here.</p>
+
+        <label class="f" for="pl-note" style="margin-top:12px">Anything else <span class="fine">(optional)</span></label>
+        <textarea id="pl-note" name="note" rows="3" maxlength="500" placeholder="Opening hours, why it's worth going, a website — whatever you know."></textarea>
+
+        <div id="pl-captcha" style="margin:12px 0"></div>
+
+        <button class="btn btn-signal" type="submit" id="pl-submit" style="align-self:flex-start">Send it in &#9656;</button>
+      </form>
+      <p class="fine" id="pl-msg">Every submission is checked by a person before it reaches the app. No account needed.</p>
+    </div>
+
+    <div class="panel-lg">
+      <span class="label">What happens next</span>
+      <h2>Checked, then pinned.</h2>
+      <p>Submissions go into a review queue. We confirm the place exists, pull its real location from Google Places, and give it a verified coordinate before it ever shows up in the app — which is why coordinates from you are a bonus rather than a requirement.</p>
+      <p>If you sent coordinates, they're used as the starting point for that check, which makes a place in a big park or a rural area much easier to pin correctly.</p>
+      <p class="fine">Built a whole trip instead? <a href="/plan/">Turn a written plan into an itinerary</a>, or <a href="/#share">share a trip you've made</a>.</p>
+    </div>
+  </div>
+</div></section>
+
+{% if site.turnstileSiteKey %}<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>{% endif %}
+{% raw %}<script>
+(function () {
+  var API = {% endraw %}{{ site.apiUrl | dump | safe }}{% raw %};
+  var SITE_KEY = {% endraw %}{{ site.turnstileSiteKey | dump | safe }}{% raw %};
+
+  var form = document.getElementById('place-form');
+  var msg = document.getElementById('pl-msg');
+  var btn = document.getElementById('pl-submit');
+  var widgetId = null;
+  if (!form) return;
+
+  if (SITE_KEY) {
+    var t = setInterval(function () {
+      if (window.turnstile) {
+        clearInterval(t);
+        widgetId = window.turnstile.render('#pl-captcha', { sitekey: SITE_KEY });
+      }
+    }, 150);
+    setTimeout(function () { clearInterval(t); }, 15000);
+  }
+
+  function fail(m) {
+    msg.textContent = m;
+    msg.style.color = '#ff9b9b';
+    btn.disabled = false;
+    btn.textContent = 'Send it in ▸';
+    if (widgetId !== null && window.turnstile) window.turnstile.reset(widgetId);
+  }
+
+  // People paste "44.4118, 8.9298" into whichever box they clicked first. Split
+  // it rather than rejecting it — a pasted pair is the normal case, not an error.
+  function splitPair() {
+    var lat = document.getElementById('pl-lat');
+    var lng = document.getElementById('pl-lng');
+    var m = lat.value.match(/^\s*(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)\s*$/);
+    if (m && !lng.value.trim()) { lat.value = m[1]; lng.value = m[2]; }
+  }
+  document.getElementById('pl-lat').addEventListener('blur', splitPair);
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    splitPair();
+    var city = document.getElementById('pl-city').value.trim();
+    var name = document.getElementById('pl-name').value.trim();
+    if (!city) return fail('Which city is it in?');
+    if (!name) return fail('What is the place called?');
+
+    var lat = document.getElementById('pl-lat').value.trim();
+    var lng = document.getElementById('pl-lng').value.trim();
+    if ((lat && !lng) || (lng && !lat)) return fail('Give both latitude and longitude, or leave both blank.');
+
+    var token = '';
+    if (SITE_KEY) {
+      token = (widgetId !== null && window.turnstile) ? window.turnstile.getResponse(widgetId) : '';
+      if (!token) return fail('Complete the verification box first.');
+    }
+
+    msg.style.color = '';
+    msg.textContent = 'Sending…';
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+
+    fetch(API + '/api/web/place-submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        city: city, name: name,
+        category: document.getElementById('pl-cat').value,
+        lat: lat, lng: lng,
+        note: document.getElementById('pl-note').value.trim(),
+        captchaToken: token,
+        website: form.website.value
+      })
+    }).then(function (r) {
+      return r.json().then(function (d) { return { ok: r.ok, d: d }; });
+    }).then(function (res) {
+      if (!res.ok || !res.d || !res.d.ok) {
+        return fail((res.d && res.d.message) || 'Could not send that. Try again in a moment.');
+      }
+      form.style.display = 'none';
+      var box = document.getElementById('pl-captcha');
+      if (box) box.style.display = 'none';
+      msg.style.color = '';
+      msg.textContent = res.d.hasCoords
+        ? 'Thank you — got it, with coordinates. We’ll verify the location and add it.'
+        : 'Thank you — got it. We’ll find the exact location and add it.';
+    }).catch(function () {
+      fail('Could not reach the server. Check your connection and try again.');
+    });
+  });
+})();
+</script>{% endraw %}

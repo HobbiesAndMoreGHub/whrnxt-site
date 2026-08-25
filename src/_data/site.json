@@ -5,5 +5,6 @@
   "url": "https://whrnxt.net",
   "appUrl": "https://app.whrnxt.net",
   "apiUrl": "https://api-production-9f8f.up.railway.app",
-  "email": "support@whrnxt.net"
+  "email": "support@whrnxt.net",
+  "turnstileSiteKey": ""
 }

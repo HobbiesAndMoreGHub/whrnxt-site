@@ -1,0 +1,190 @@
+---
+layout: base.njk
+title: Text to trip
+description: Paste any trip description — an email, a blog post, a chat with an AI — and get a day-by-day WHRNXT itinerary link you can open on your phone.
+permalink: /plan/index.html
+---
+<section class="block"><div class="wrap">
+  <div class="sec-head">
+    <span class="label">Build a trip</span>
+    <h2>Paste a plan, get an itinerary.</h2>
+    <p>Anything that describes a trip works — an email from a friend, a blog post, a list of places, a plan an AI wrote for you. It comes back as a day-by-day WHRNXT link you can open on your phone, reorder, optimise for walking, and share.</p>
+  </div>
+
+  {% if not site.turnstileSiteKey %}<div class="plan-warn" style="border-color:#b8860b;margin-bottom:16px">
+    <strong>Not live yet</strong>
+    <p class="fine">This form needs a Cloudflare Turnstile site key before it will work. Set <code>turnstileSiteKey</code> in <code>src/_data/site.json</code> and <code>TURNSTILE_SECRET</code> on the API. Until then the server refuses submissions on purpose.</p>
+  </div>{% endif %}
+  <div class="panel-lg">
+    <form id="plan-form" novalidate>
+      <p hidden><label>Leave blank: <input name="website" tabindex="-1" autocomplete="off"></label></p>
+
+      <label class="f" for="p-title">Trip name <span class="fine">(optional)</span></label>
+      <input id="p-title" name="title" placeholder="Five days in Rome" maxlength="120">
+
+      <label class="f" for="p-text" style="margin-top:12px">Your trip description</label>
+      <textarea id="p-text" name="text" rows="12" required
+        placeholder="Day 1 — Rome. Colosseum in the morning, then the Roman Forum and Palatine Hill. Lunch near Campo de' Fiori. Pantheon in the afternoon, Trevi Fountain after dark.&#10;&#10;Day 2 — Vatican Museums early, Sistine Chapel, St Peter's Basilica. Castel Sant'Angelo on the walk back."></textarea>
+      <p class="fine" id="p-count">0 characters</p>
+
+      <div id="p-captcha" style="margin:12px 0"></div>
+
+      <button class="btn btn-signal" type="submit" id="p-submit" style="align-self:flex-start">Build my trip &#9656;</button>
+    </form>
+
+    <p class="fine" id="p-msg">Nothing is stored against you — no account, no login. The trip becomes a link you keep.</p>
+
+    <div id="p-result" hidden style="margin-top:18px">
+      <div class="plan-ok">
+        <span class="label">Your trip is ready</span>
+        <p class="fine" style="margin:6px 0 10px">Open it in WHRNXT, or copy the link and keep it. It works on any phone.</p>
+        <div class="form-row">
+          <a class="btn btn-signal" id="p-open" href="#" target="_blank" rel="noopener">Open in WHRNXT &#9656;</a>
+          <button class="btn" type="button" id="p-copy">Copy link</button>
+        </div>
+        <input id="p-url" readonly style="margin-top:10px" onclick="this.select()">
+      </div>
+
+      <div class="plan-warn" id="p-notinapp" hidden>
+        <strong id="p-notinapp-head"></strong>
+        <p class="fine">These stops aren't in WHRNXT's place database yet, so they were pinned from their address rather than a checked location. They'll work in your trip — but the pin may be a street or a rooftop rather than the door. Worth a look on the map, and you can send them to us to add properly.</p>
+        <ul class="plan-list" id="p-notinapp-list"></ul>
+        <a class="browse" href="/add-place/">Add a missing place &#9656;</a>
+      </div>
+
+      <div class="plan-warn" id="p-warnings" hidden>
+        <strong>A few things to know</strong>
+        <ul class="plan-list" id="p-warnings-list"></ul>
+      </div>
+    </div>
+  </div>
+
+  <p class="fine" style="margin-top:14px">Already built a trip in the app? <a href="/#share">Share it with other travellers</a>.</p>
+</div></section>
+
+{% if site.turnstileSiteKey %}<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>{% endif %}
+{% raw %}<script>
+(function () {
+  var API = {% endraw %}{{ site.apiUrl | dump | safe }}{% raw %};
+  var SITE_KEY = {% endraw %}{{ site.turnstileSiteKey | dump | safe }}{% raw %};
+  var MAX = 12000;
+
+  var form = document.getElementById('plan-form');
+  var text = document.getElementById('p-text');
+  var count = document.getElementById('p-count');
+  var msg = document.getElementById('p-msg');
+  var btn = document.getElementById('p-submit');
+  var result = document.getElementById('p-result');
+  var widgetId = null;
+
+  if (!form) return;
+
+  text.addEventListener('input', function () {
+    var n = text.value.length;
+    count.textContent = n.toLocaleString() + ' characters' + (n > MAX ? ' — too long, trim it down' : '');
+    count.style.color = n > MAX ? '#ff9b9b' : '';
+  });
+
+  // Rendered explicitly so the token can be reset after every submit: a
+  // Turnstile token is single-use, and a second submit with a spent token is
+  // rejected by Cloudflare, not by us.
+  window.onloadTurnstileCallback = function () {
+    if (!SITE_KEY || !window.turnstile) return;
+    widgetId = window.turnstile.render('#p-captcha', { sitekey: SITE_KEY });
+  };
+  if (SITE_KEY) {
+    var t = setInterval(function () {
+      if (window.turnstile) { clearInterval(t); window.onloadTurnstileCallback(); }
+    }, 150);
+    setTimeout(function () { clearInterval(t); }, 15000);
+  }
+
+  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+  function show(el, on) { el.hidden = !on; }
+
+  function fail(m) {
+    msg.textContent = m;
+    msg.style.color = '#ff9b9b';
+    btn.disabled = false;
+    btn.textContent = 'Build my trip ▸';
+    if (widgetId !== null && window.turnstile) window.turnstile.reset(widgetId);
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var body = text.value.trim();
+    if (!body) return fail('Paste a trip description first.');
+    if (body.length > MAX) return fail('That is too long — keep it under ' + MAX.toLocaleString() + ' characters.');
+
+    var token = '';
+    if (SITE_KEY) {
+      token = (widgetId !== null && window.turnstile) ? window.turnstile.getResponse(widgetId) : '';
+      if (!token) return fail('Complete the verification box first.');
+    }
+
+    msg.style.color = '';
+    msg.textContent = 'Reading your plan and matching places… this takes a few seconds.';
+    btn.disabled = true;
+    btn.textContent = 'Building…';
+    show(result, false);
+
+    fetch(API + '/api/web/from-text', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: body,
+        title: document.getElementById('p-title').value.trim(),
+        captchaToken: token,
+        website: form.website.value
+      })
+    }).then(function (r) {
+      return r.json().then(function (d) { return { ok: r.ok, d: d }; });
+    }).then(function (res) {
+      if (!res.ok || !res.d || !res.d.url) {
+        return fail((res.d && res.d.message) || 'Could not build that trip. Try adding day headings and place names.');
+      }
+      var d = res.d;
+      document.getElementById('p-open').href = d.url;
+      document.getElementById('p-url').value = d.url;
+
+      var nia = d.notInApp || [];
+      var niaBox = document.getElementById('p-notinapp');
+      if (nia.length) {
+        document.getElementById('p-notinapp-head').textContent =
+          nia.length + (nia.length === 1 ? ' stop is not in WHRNXT yet' : ' stops are not in WHRNXT yet');
+        document.getElementById('p-notinapp-list').innerHTML = nia.map(function (p) {
+          var where = p.city ? ' <span class="fine">' + esc(p.city) + '</span>' : '';
+          var co = (p.lat != null && p.lng != null)
+            ? ' <span class="fine">' + p.lat.toFixed(4) + ', ' + p.lng.toFixed(4) + '</span>' : '';
+          return '<li>' + esc(p.name) + where + co + '</li>';
+        }).join('');
+      }
+      show(niaBox, nia.length > 0);
+
+      var warn = (d.warnings || []).filter(Boolean);
+      var warnBox = document.getElementById('p-warnings');
+      if (warn.length) {
+        document.getElementById('p-warnings-list').innerHTML = warn.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('');
+      }
+      show(warnBox, warn.length > 0);
+
+      show(result, true);
+      msg.textContent = 'Done. The link below is yours to keep or share.';
+      btn.disabled = false;
+      btn.textContent = 'Build another ▸';
+      if (widgetId !== null && window.turnstile) window.turnstile.reset(widgetId);
+      result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }).catch(function () {
+      fail('Could not reach the server. Check your connection and try again.');
+    });
+  });
+
+  document.getElementById('p-copy').addEventListener('click', function () {
+    var f = document.getElementById('p-url');
+    f.select();
+    var done = function () { var b = document.getElementById('p-copy'); b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy link'; }, 1600); };
+    if (navigator.clipboard) navigator.clipboard.writeText(f.value).then(done, done);
+    else { try { document.execCommand('copy'); done(); } catch (e) {} }
+  });
+})();
+</script>{% endraw %}
