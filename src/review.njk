@@ -18,6 +18,7 @@ noindex: true
     <input id="rv-token" type="password" autocomplete="current-password" placeholder="Paste the ADMIN_TOKEN set on the API" required>
     <button class="btn btn-signal" type="submit" style="align-self:flex-start">Open queue &#9656;</button>
     <p class="fine">Held for this browser tab only, and never sent anywhere but the WHRNXT API. Closing the tab forgets it.</p>
+    <p class="fine" id="rv-why" style="color:#d29922"></p>
     <p class="fine">Or sign in at <a href="/admin/">/admin</a> with GitHub and come back — this page will use that session, no token needed. Your GitHub username has to be listed in <code>ADMIN_GITHUB_USERS</code> on the API.</p>
   </form>
 
@@ -78,13 +79,37 @@ noindex: true
   //
   // The ADMIN_TOKEN box stays as the fallback: it is what scripts use, and it is
   // the way in if the CMS session has expired or you never opened /admin.
+  // Decap stores its session as JSON under decap-cms-user. Reading only that one
+  // key and only a top-level `token` assumed a shape; when it did not match, the
+  // page fell back to the password box with nothing to say about why. So: try
+  // every plausible place, across any cms-user key, and record what was found.
+  var ghProbe = { keys: [], picked: '', reason: '' };
   function githubToken(){
+    ghProbe = { keys: [], picked: '', reason: '' };
+    var candidates = [];
     try {
-      var raw = localStorage.getItem('decap-cms-user');
-      if (!raw) return '';
-      var u = JSON.parse(raw);
-      return (u && u.token) ? String(u.token) : '';
-    } catch (e) { return ''; }
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && /cms[-.]?user/i.test(k)) candidates.push(k);
+      }
+    } catch (e) { ghProbe.reason = 'localStorage unreadable: ' + e.message; return ''; }
+    ghProbe.keys = candidates.slice();
+    if (!candidates.length) { ghProbe.reason = 'no cms-user key in localStorage for ' + location.origin; return ''; }
+
+    for (var j = 0; j < candidates.length; j++) {
+      var raw;
+      try { raw = localStorage.getItem(candidates[j]); } catch (e) { continue; }
+      if (!raw) continue;
+      var u;
+      try { u = JSON.parse(raw); } catch (e) { ghProbe.reason = candidates[j] + ' is not JSON'; continue; }
+      if (!u || typeof u !== 'object') continue;
+      var t = u.token || u.access_token || u.accessToken
+           || (u.data && (u.data.token || u.data.access_token))
+           || (u.user && u.user.token);
+      if (t) { ghProbe.picked = candidates[j]; return String(t); }
+      ghProbe.reason = candidates[j] + ' has no token field (keys: ' + Object.keys(u).join(', ') + ')';
+    }
+    return '';
   }
   // Header for whichever credential we have. GitHub first — it identifies a
   // person rather than proving possession of a shared secret.
@@ -106,6 +131,13 @@ noindex: true
     board.hidden = true;
     gate.hidden = false;
     tokenIn.focus();
+    var why = document.getElementById('rv-why');
+    if (why) {
+      githubToken();  // fills ghProbe
+      why.textContent = ghProbe.reason
+        ? ('No /admin session found — ' + ghProbe.reason)
+        : (ghProbe.keys.length ? 'Found ' + ghProbe.keys.join(', ') + ' but no usable token.' : '');
+    }
   }
 
   function showBoard(){
