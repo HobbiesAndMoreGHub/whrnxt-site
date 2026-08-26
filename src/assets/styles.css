@@ -324,3 +324,8 @@ select:focus{outline:2px solid var(--signal);outline-offset:1px;border-color:var
   padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:#0d131d;line-height:1.4}
 .p-share input{width:auto;margin-top:2px;flex:0 0 auto}
 .p-share .fine{display:block;margin-top:2px}
+
+/* /trips/ grouped by city */
+.trip-group{grid-column:1/-1;margin:22px 0 2px;font-size:14px;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--dim,#8b95a5);font-weight:700}
+.trip-group:first-child{margin-top:0}

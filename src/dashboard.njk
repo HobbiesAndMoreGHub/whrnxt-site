@@ -86,6 +86,19 @@ eleventyExcludeFromCollections: true
   .empty{background:var(--panel-2);border:1px dashed var(--line);border-radius:12px;
     padding:26px;text-align:center;color:var(--muted)}
   .soon{border:1px dashed var(--line);border-radius:12px;padding:22px;color:var(--muted);background:var(--panel-2)}
+  .cityedit{margin:0 0 10px}
+  .cityedit label{display:block;margin-bottom:4px;color:var(--muted);font-size:12px}
+  .cityrow{display:flex;gap:8px;position:relative}
+  .cityin{flex:1;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
+    color:var(--ink);padding:8px 10px;font:inherit;font-size:14px}
+  .cityin:focus{outline:2px solid var(--signal);outline-offset:1px}
+  .rec-btn{padding:6px 11px;font-size:13px;white-space:nowrap}
+  .find-suggest{list-style:none;margin:4px 0 0;padding:0;position:absolute;top:100%;left:0;right:0;z-index:50;
+    background:var(--panel-2);border:1px solid var(--line);border-radius:8px;overflow:hidden;
+    max-height:220px;overflow-y:auto}
+  .find-suggest-item{padding:8px 11px;cursor:pointer;border-bottom:1px solid var(--line);font-size:14px}
+  .find-suggest-item:last-child{border-bottom:none}
+  .find-suggest-item:hover,.find-suggest-item.active{background:#1b2635}
   code{background:#0a0f17;border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12.5px}
   @media(max-width:760px){
     .shell{grid-template-columns:1fr}
@@ -143,6 +156,7 @@ eleventyExcludeFromCollections: true
   </main>
 </div>
 
+{% include "citypicker.njk" %}
 <script>
 // Anything that escapes is shown on the page. A dashboard that fails silently is
 // indistinguishable from one that is merely slow, and "nothing happened" is the
@@ -395,17 +409,43 @@ window.addEventListener('unhandledrejection', function (e) {
       return;
     }
     b.innerHTML = items.map(section === 'trips' ? tripRow : placeRow).join('');
+    if (section === 'trips' && window.whrnxtCityPicker) {
+      Array.prototype.forEach.call(b.querySelectorAll('.cityin'), function (el) {
+        window.whrnxtCityPicker(el, { api: API });
+      });
+    }
   }
 
   function tripRow(t){
     var href = safeHref(t.link);
+    // A submission with no city cannot be sorted or found, and senders leave the
+    // box empty often enough that it has to be fixable here rather than bounced
+    // back to them.
+    var cityBlock =
+      '<div class="cityedit">' +
+        '<label class="fine" for="city-' + esc(t.id) + '">' +
+          (t.cities ? 'City' : 'No city given \u2014 add one so it can be found') + '</label>' +
+        '<div class="cityrow">' +
+          '<input id="city-' + esc(t.id) + '" class="cityin" value="' + esc(t.cities || '') + '"' +
+            ' placeholder="Start typing \u2014 e.g. Lisbon" autocomplete="off">' +
+          '<button class="btn rec-btn" data-savecity="' + esc(t.id) + '">Save</button>' +
+        '</div>' +
+      '</div>';
     return '<div class="row" data-id="' + esc(t.id) + '">' +
-      (t.cities ? '<span class="label">' + esc(t.cities) + '</span>' : '') +
+      (t.cities
+        ? '<span class="label">' + esc(t.cities) + '</span>'
+        : '<span class="label" style="color:var(--warn)">no city</span>') +
       '<h3>' + esc(t.title) + '</h3>' +
       (t.note ? '<p>' + esc(t.note) + '</p>' : '') +
       '<p class="meta">' + (href
         ? '<a href="' + esc(href) + '" target="_blank" rel="nofollow noopener noreferrer">' + esc(href) + '</a>'
         : esc(String(t.link||'')) + ' (not a usable link)') + '</p>' +
+      cityBlock +
+      '<div class="acts" style="margin-bottom:8px">' +
+        '<button class="btn rec-btn" data-opt="quick" data-id="' + esc(t.id) + '">Reorder stops</button>' +
+        '<button class="btn rec-btn" data-opt="google" data-id="' + esc(t.id) + '">Reorder with Google</button>' +
+      '</div>' +
+      '<p class="meta" data-optout="' + esc(t.id) + '"></p>' +
       '<p class="meta">' + when(t.created_at) + ' · id ' + esc(t.id) + '</p>' +
       acts(t.id) + '</div>';
   }
@@ -477,6 +517,50 @@ window.addEventListener('unhandledrejection', function (e) {
     });
   }
 
+  function saveCity(id, btn){
+    var input = document.getElementById('city-' + id);
+    if (!input) return;
+    var was = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Saving...';
+    api('/api/trips/' + encodeURIComponent(id) + '/edit', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ cities: input.value.trim() })
+    }).then(function(t){
+      btn.disabled = false; btn.textContent = was;
+      var row = btn.closest('.row');
+      var label = row && row.querySelector('.label');
+      if (label) { label.textContent = t.cities || 'no city'; label.style.color = t.cities ? '' : 'var(--warn)'; }
+      say('City saved.', 'good');
+    }).catch(function(e){ btn.disabled = false; btn.textContent = was; fail(e); });
+  }
+
+  // Reordering republishes under a new slug, so the row's link is replaced too.
+  function optimize(id, mode, btn){
+    var row = btn.closest('.row');
+    var out = row && row.querySelector('[data-optout]');
+    var was = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Working...';
+    if (out) { out.textContent = ''; out.style.color = ''; }
+    api('/api/trips/' + encodeURIComponent(id) + '/optimize', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mode: mode })
+    }).then(function(d){
+      btn.disabled = false; btn.textContent = was;
+      if (!d.changed) { if (out) out.textContent = d.message || 'Nothing to change.'; return; }
+      if (out) {
+        out.style.color = 'var(--ok)';
+        out.textContent = 'Reordered ' + d.daysChanged + ' day' + (d.daysChanged === 1 ? '' : 's') +
+          ' (' + d.mode + ')' + (d.skipped ? ', ' + d.skipped + ' left alone' : '') + '.';
+      }
+      var a = row && row.querySelector('.meta a');
+      if (a) { a.href = d.link; a.textContent = d.link; }
+      say('Reordered. The submission now points at the tidied trip.', 'good');
+    }).catch(function(e){
+      btn.disabled = false; btn.textContent = was;
+      if (out) { out.style.color = 'var(--bad)'; out.textContent = e.message; }
+    });
+  }
+
   // ── wiring ────────────────────────────────────────────────────────────────
   document.addEventListener('click', function(e){
     var nav = e.target.closest('.navb[data-sec]');
@@ -485,6 +569,10 @@ window.addEventListener('unhandledrejection', function (e) {
     if (go) { section = go.getAttribute('data-go'); status = 'pending'; renderQueue.data = null; load(); return; }
     var tab = e.target.closest('.tab[data-status]');
     if (tab) { status = tab.getAttribute('data-status'); renderQueue.data = null; load(); return; }
+    var save = e.target.closest('[data-savecity]');
+    if (save) { saveCity(save.getAttribute('data-savecity'), save); return; }
+    var opt = e.target.closest('[data-opt]');
+    if (opt) { optimize(opt.getAttribute('data-id'), opt.getAttribute('data-opt'), opt); return; }
     var act = e.target.closest('[data-act]');
     if (act) { moderate(act.getAttribute('data-id'), act.getAttribute('data-act'), act.closest('.row'), act); return; }
   });

@@ -59,7 +59,28 @@ permalink: /trips/index.html
       var trips = (d && d.trips) || [];
       loading.remove();
       if (!trips.length) { empty.hidden = false; return; }
-      trips.forEach(function(t){ list.appendChild(card(t)); });
+      // Grouped by city, cities alphabetical. A flat newest-first list is the
+      // wrong shape for this page: people arrive wanting somewhere, not
+      // whatever happened to be posted most recently.
+      var groups = {};
+      trips.forEach(function(t){
+        // Group under the first city. Older submissions used commas and cannot be
+        // split safely, so those are taken whole rather than guessed at.
+        var raw = (t.cities || '').trim();
+        var key = raw ? (raw.indexOf(' · ') >= 0 ? raw.split(' · ')[0].trim() : raw) : 'Elsewhere';
+        (groups[key] = groups[key] || []).push(t);
+      });
+      Object.keys(groups).sort(function(a, b){
+        if (a === 'Elsewhere') return 1;      // unnamed sinks to the bottom
+        if (b === 'Elsewhere') return -1;
+        return a.localeCompare(b);
+      }).forEach(function(key){
+        var h = document.createElement('h3');
+        h.className = 'trip-group';
+        h.textContent = key;
+        list.appendChild(h);
+        groups[key].forEach(function(t){ list.appendChild(card(t)); });
+      });
     })
     .catch(function(){
       loading.textContent = 'Could not load trips just now — please try again shortly.';

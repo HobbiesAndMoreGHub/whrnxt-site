@@ -55,7 +55,7 @@ layout: base.njk
         <label class="f" for="t-title">Trip title</label>
         <input id="t-title" name="title" placeholder="A long weekend in Lisbon" required>
         <div class="form-row">
-          <div><label class="f" for="t-cities">Cities</label><input id="t-cities" name="cities" placeholder="Lisbon, Sintra"></div>
+          <div style="position:relative"><label class="f" for="t-cities">Cities</label><input id="t-cities" name="cities" placeholder="Start typing — e.g. Lisbon" autocomplete="off"><span class="fine" id="t-cities-hint">Matched against the app so your trip can be found by city.</span></div>
           <div><label class="f" for="t-link">Share link</label><input id="t-link" name="link" type="url" placeholder="https://app.whrnxt.net/?i=…" required></div>
         </div>
         <button class="btn btn-signal" type="submit" id="trip-submit" style="align-self:flex-start;margin-top:6px">Post trip &#9656;</button>
@@ -102,11 +102,14 @@ layout: base.njk
   </div></div></section>
 </main>
 
-{% raw %}<script>
+{% include "citypicker.njk" %}
+{% raw %}
+<script>
 // Trip submission → held as pending on the server until a human approves it.
 (function(){
   var API = {% endraw %}{{ site.apiUrl | dump | safe }}{% raw %};
   var form = document.getElementById('trip-form');
+  if (window.whrnxtCityPicker) window.whrnxtCityPicker(document.getElementById('t-cities'), { api: API });
   var msg  = document.getElementById('trip-msg');
   var btn  = document.getElementById('trip-submit');
   if(!form) return;

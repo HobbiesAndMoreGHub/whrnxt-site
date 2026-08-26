@@ -1,0 +1,95 @@
+<script>
+// Shared city picker. Attaches to an <input> and matches what is typed against
+// the app's own 2,900-city list, so a submitted city name is one the app
+// actually has — which is what makes sorting and grouping by city possible at
+// all. Falls back to accepting free text if the list cannot be fetched: a
+// missing autocomplete must not stop someone posting a trip.
+(function () {
+  var API = ''; var cache = null; var pending = null;
+  // Not a comma: city names contain commas ("Lisbon, Portugal", "Aberdeen (SD,
+  // USA)"), so a comma-separated list of them cannot be split back into cities,
+  // which is what grouping the shared-trips page by city depends on.
+  var SEP = ' · ';
+  window.whrnxtCityPicker = function (input, opts) {
+    opts = opts || {};
+    API = opts.api || API;
+    if (!input) return;
+    var box = document.createElement('ul');
+    box.className = 'find-suggest';
+    box.style.display = 'none';
+    input.parentNode.insertBefore(box, input.nextSibling);
+    var items = [], idx = -1, timer = null;
+
+    function cities() {
+      if (cache) return Promise.resolve(cache);
+      if (pending) return pending;
+      pending = fetch(API + '/api/cities')
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          cache = [];
+          var map = (d && d.cities) || {};
+          for (var slug in map) if (Object.prototype.hasOwnProperty.call(map, slug)) {
+            cache.push({ slug: slug, name: map[slug], key: String(map[slug]).toLowerCase() });
+          }
+          cache.sort(function (a, b) { return a.name.localeCompare(b.name); });
+          return cache;
+        }).catch(function () { cache = []; return cache; });
+      return pending;
+    }
+    function close() { box.style.display = 'none'; items = []; idx = -1; }
+    function draw() {
+      if (!items.length) return close();
+      box.innerHTML = items.map(function (c, i) {
+        return '<li class="find-suggest-item' + (i === idx ? ' active' : '') + '" data-i="' + i + '">' +
+               '<span class="find-suggest-name"></span></li>';
+      }).join('');
+      Array.prototype.forEach.call(box.querySelectorAll('.find-suggest-name'), function (el, i) {
+        el.textContent = items[i].name;   // from our own list, but text either way
+      });
+      box.style.display = '';
+    }
+    function pick(c) {
+      if (!c) return;
+      // Append rather than replace: a trip can span several cities, and someone
+      // half way through "Lisbon, " is adding one, not correcting one.
+      var parts = input.value.split(SEP).map(function (s) { return s.trim(); }).filter(Boolean);
+      parts.pop();
+      if (parts.indexOf(c.name) === -1) parts.push(c.name);
+      input.value = parts.join(SEP);
+      if (opts.onPick) opts.onPick(c, parts);
+      close();
+      input.focus();
+    }
+    function search() {
+      var last = (input.value.split(SEP).pop() || '').trim().toLowerCase();
+      if (last.length < 2) return close();
+      cities().then(function (all) {
+        var starts = [], has = [];
+        for (var i = 0; i < all.length && starts.length + has.length < 40; i++) {
+          var k = all[i].key;
+          if (k.indexOf(last) === 0) starts.push(all[i]);
+          else if (k.indexOf(last) > 0) has.push(all[i]);
+        }
+        items = starts.concat(has).slice(0, 8);
+        idx = -1;
+        draw();
+      });
+    }
+    input.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(search, 160); });
+    input.addEventListener('keydown', function (e) {
+      if (!items.length) return;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        idx = (idx + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+        draw();
+      } else if (e.key === 'Enter' && idx >= 0) { e.preventDefault(); pick(items[idx]); }
+      else if (e.key === 'Escape') { close(); }
+    });
+    input.addEventListener('blur', function () { setTimeout(close, 160); });
+    box.addEventListener('mousedown', function (e) {
+      var li = e.target.closest('[data-i]');
+      if (li) { e.preventDefault(); pick(items[+li.getAttribute('data-i')]); }
+    });
+  };
+})();
+</script>
