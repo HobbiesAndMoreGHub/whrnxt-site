@@ -172,11 +172,16 @@ window.addEventListener('unhandledrejection', function (e) {
   // Decap's session is still accepted when present, because being signed into
   // /admin/cms and then bounced to a login here would be nonsense.
   var sess = null;
+  var OUT = KEY + '-signedout';
   function loadSession(){
     try {
       var mine = JSON.parse(sessionStorage.getItem(KEY) || 'null');
       if (mine && (mine.gh || mine.token)) return mine;
     } catch(e){}
+    // Signing out then reloading used to sign you straight back in, because the
+    // CMS session is still sitting in localStorage and this fallback found it.
+    // A sign-out that a refresh undoes is not a sign-out.
+    try { if (sessionStorage.getItem(OUT)) return null; } catch(e){}
     try {
       for (var i=0;i<localStorage.length;i++){
         var k = localStorage.key(i);
@@ -188,7 +193,10 @@ window.addEventListener('unhandledrejection', function (e) {
     } catch(e){}
     return null;
   }
-  function saveSession(s){ sess = s; try{ sessionStorage.setItem(KEY, JSON.stringify(s)); }catch(e){} }
+  function saveSession(s){
+    sess = s;
+    try { sessionStorage.setItem(KEY, JSON.stringify(s)); sessionStorage.removeItem(OUT); } catch(e){}
+  }
   function headers(extra){
     var h = extra || {};
     if (sess && sess.gh) h['Authorization'] = 'Bearer ' + sess.gh;
@@ -498,8 +506,13 @@ window.addEventListener('unhandledrejection', function (e) {
     });
   });
   $('signout').addEventListener('click', function(){
-    try { sessionStorage.removeItem(KEY); } catch(e){}
+    try { sessionStorage.removeItem(KEY); sessionStorage.setItem(OUT, '1'); } catch(e){}
     sess = null;
+    summary = null;
+    renderQueue.data = null;
+    section = 'overview';
+    $('body').innerHTML = '';
+    say('');
     show($('shell'), false); show($('gate'), true);
     // Deliberately does not touch the CMS session — that belongs to /admin/cms.
     $('gate-msg').textContent = 'Signed out of the dashboard. The article editor keeps its own session.';
