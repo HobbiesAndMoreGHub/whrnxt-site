@@ -19,6 +19,11 @@ eleventyExcludeFromCollections: true
     --ok:#3fb950; --warn:#d29922; --bad:#f0616d;
   }
   *{box-sizing:border-box}
+  /* .gate is display:flex and .shell is display:grid, and both beat the browser's
+     [hidden]{display:none} on specificity — so hiding either did nothing and the
+     sign-in panel stayed above the dashboard, a full viewport of empty space
+     between them. The whole show/hide mechanism depends on this rule winning. */
+  [hidden]{display:none !important}
   body{margin:0;background:var(--bg);color:var(--ink);
     font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   a{color:inherit}
@@ -211,7 +216,10 @@ window.addEventListener('unhandledrejection', function (e) {
     var done = false;
     function onMsg(e){
       if (typeof e.data !== 'string') return;
-      trace('msg from ' + e.origin + ': ' + e.data.slice(0, 48));
+      // Redacted: the success message carries the access token, and the trace is
+      // rendered into the page. What matters here is which message arrived, not
+      // its contents.
+      trace('msg from ' + e.origin + ': ' + e.data.replace(/("token"\s*:\s*")[^"]*/, '$1…').slice(0, 90));
       if (e.data.indexOf('authorizing:github') === 0) {
         // Reply to the window that actually sent this, not the handle from
         // window.open. After the trip out to github.com and back the stored
@@ -235,6 +243,9 @@ window.addEventListener('unhandledrejection', function (e) {
         return;
       }
       saveSession({ gh: payload.token, via: 'github' });
+      var tr = $('gate-trace');
+      if (tr) { tr.hidden = true; tr.textContent = ''; }
+      traceLines = [];
       start();
     }
     window.addEventListener('message', onMsg);
