@@ -9,3 +9,18 @@
 # Decap CMS GitHub OAuth handler
 [functions]
   directory = "netlify/functions"
+
+# /review/ was the moderation queue before the dashboard existed. It is gone, and
+# the dashboard does both queues, so anyone with the old URL bookmarked lands in
+# the right place rather than on a 404.
+[[redirects]]
+  from = "/review"
+  to = "/admin/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/review/*"
+  to = "/admin/"
+  status = 301
+  force = true

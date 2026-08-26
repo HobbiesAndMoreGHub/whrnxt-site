@@ -6,9 +6,9 @@ module.exports = function (eleventyConfig) {
   // so they can't live under /assets. Copies of the app's own icons.
   eleventyConfig.addPassthroughCopy({ "src/icons": "." });
 
-  // Decap CMS admin — copy verbatim, don't run it through the template engine.
+  // Decap CMS (now at /admin/cms) — copy verbatim, don't run it through the template engine.
   eleventyConfig.addPassthroughCopy("src/admin");
-  eleventyConfig.ignores.add("src/admin/index.html");
+  eleventyConfig.ignores.add("src/admin/cms/index.html");
 
   // Human-readable date filter for articles.
   eleventyConfig.addFilter("readableDate", (d) =>

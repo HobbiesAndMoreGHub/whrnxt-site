@@ -1,0 +1,450 @@
+---
+layout: null
+permalink: /admin/index.html
+sitemap: false
+eleventyExcludeFromCollections: true
+---
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>WHRNXT — Admin</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#111823; --panel-2:#0d131d; --line:#222c3a;
+    --ink:#e8edf5; --muted:#8b95a5; --signal:#ffd166; --signal-ink:#10131a;
+    --ok:#3fb950; --warn:#d29922; --bad:#f0616d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:inherit}
+  button{font:inherit;cursor:pointer}
+  .btn{border:1px solid transparent;border-radius:9px;padding:9px 14px;font-weight:700;
+    display:inline-flex;align-items:center;gap:7px;text-decoration:none;background:#1a2432;color:var(--ink)}
+  .btn:hover{border-color:#3a4658}
+  .btn-signal{background:var(--signal);color:var(--signal-ink)}
+  .btn-ghost{background:transparent;border-color:var(--line);color:var(--muted)}
+  .btn:disabled{opacity:.5;cursor:default}
+
+  /* sign-in */
+  .gate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .gate-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    padding:32px;max-width:440px;width:100%}
+  .gate-card h1{margin:0 0 6px;font-size:22px}
+  .gate-card p{color:var(--muted);margin:0 0 18px}
+
+  /* shell */
+  .shell{display:grid;grid-template-columns:210px 1fr;min-height:100vh}
+  .side{background:var(--panel);border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column;gap:4px}
+  .brand{font-weight:900;font-size:18px;letter-spacing:.02em;padding:6px 10px 16px}
+  .brand span{color:var(--signal)}
+  .navb{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    background:none;border:none;color:var(--muted);text-align:left;padding:9px 10px;
+    border-radius:8px;font-weight:600;width:100%;text-decoration:none}
+  .navb:hover{background:#16202d;color:var(--ink)}
+  .navb.on{background:#1b2635;color:var(--ink)}
+  .pill{background:var(--warn);color:#1a1204;border-radius:999px;font-size:11px;font-weight:800;padding:2px 7px;min-width:20px;text-align:center}
+  .side-foot{margin-top:auto;padding:10px;color:var(--muted);font-size:12px;line-height:1.4}
+
+  .main{padding:26px 30px 60px;min-width:0}
+  .head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:4px}
+  .head h2{margin:0;font-size:22px}
+  .sub{color:var(--muted);margin:2px 0 20px}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-bottom:26px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .stat b{display:block;font-size:26px;line-height:1.1;margin-bottom:2px}
+  .stat span{color:var(--muted);font-size:13px}
+  .stat.attn{border-color:#5a4410}
+  .stat.attn b{color:var(--signal)}
+
+  .row{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:14px 16px;margin-bottom:10px}
+  .row h3{margin:0 0 4px;font-size:16px}
+  .row .label{display:inline-block;color:var(--muted);font-size:11px;letter-spacing:.09em;
+    text-transform:uppercase;margin-bottom:6px}
+  .row p{margin:0 0 8px;color:#c2cbd8}
+  .meta{color:var(--muted);font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    word-break:break-all;margin:0 0 10px}
+  .acts{display:flex;gap:8px;flex-wrap:wrap}
+  .row.gone{opacity:.35;transition:opacity .25s}
+
+  .tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+  .tab{background:none;border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:6px 13px;font-weight:600;font-size:13px}
+  .tab.on{background:#1b2635;color:var(--ink);border-color:#3a4658}
+  .msg{min-height:20px;color:var(--muted);font-size:13px;margin-bottom:10px}
+  .msg.bad{color:var(--bad)} .msg.good{color:var(--ok)}
+  .empty{background:var(--panel-2);border:1px dashed var(--line);border-radius:12px;
+    padding:26px;text-align:center;color:var(--muted)}
+  .soon{border:1px dashed var(--line);border-radius:12px;padding:22px;color:var(--muted);background:var(--panel-2)}
+  code{background:#0a0f17;border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12.5px}
+  @media(max-width:760px){
+    .shell{grid-template-columns:1fr}
+    .side{flex-direction:row;flex-wrap:wrap;align-items:center;border-right:none;border-bottom:1px solid var(--line)}
+    .brand{padding:0 10px 0 4px}
+    .navb{width:auto} .side-foot{display:none}
+    .main{padding:18px 16px 50px}
+  }
+</style>
+</head>
+<body>
+
+<!-- SIGN IN -->
+<div class="gate" id="gate" hidden>
+  <div class="gate-card">
+    <h1>WHRNXT admin</h1>
+    <p>Sign in with the GitHub account that owns the site.</p>
+    <button class="btn btn-signal" id="signin">Sign in with GitHub</button>
+    <p class="sub" id="gate-msg" style="margin:14px 0 0;font-size:13px"></p>
+    <details style="margin-top:16px">
+      <summary style="color:var(--muted);font-size:13px;cursor:pointer">Use an admin token instead</summary>
+      <p class="sub" style="margin:10px 0 8px;font-size:13px">For scripts, or if GitHub sign-in is unavailable.</p>
+      <input id="tok" type="password" placeholder="ADMIN_TOKEN"
+        style="width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;color:var(--ink);padding:10px 12px">
+      <button class="btn btn-ghost" id="tok-go" style="margin-top:8px">Use token</button>
+    </details>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="shell" id="shell" hidden>
+  <nav class="side">
+    <div class="brand">WHRNXT<span>&#9656;</span></div>
+    <button class="navb on" data-sec="overview">Overview</button>
+    <button class="navb" data-sec="trips">Shared trips <span class="pill" id="pill-trips" hidden></span></button>
+    <button class="navb" data-sec="places">Place submissions <span class="pill" id="pill-places" hidden></span></button>
+    <a class="navb" href="/admin/cms/">Articles &#8599;</a>
+    <button class="navb" data-sec="users">Users</button>
+    <div class="side-foot">
+      <div id="whoami"></div>
+      <button class="btn btn-ghost" id="signout" style="margin-top:8px;padding:6px 10px;font-size:12px">Sign out</button>
+    </div>
+  </nav>
+
+  <main class="main">
+    <div class="head">
+      <h2 id="sec-title">Overview</h2>
+      <button class="btn btn-ghost" id="refresh">Refresh</button>
+    </div>
+    <p class="sub" id="sec-sub"></p>
+    <div id="tabs" class="tabs" hidden></div>
+    <p class="msg" id="msg"></p>
+    <div id="body"></div>
+  </main>
+</div>
+
+<script>
+(function () {
+  var API = {{ site.apiUrl | dump | safe }};
+  var KEY = 'whrnxt-admin';          // our own session, independent of the CMS
+
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s){ var d=document.createElement('div'); d.textContent = s==null?'':s; return d.innerHTML; }
+  function show(el,on){ el.hidden = !on; }
+
+  // ── session ───────────────────────────────────────────────────────────────
+  // Our own, so the dashboard does not depend on the CMS being signed in first.
+  // Decap's session is still accepted when present, because being signed into
+  // /admin/cms and then bounced to a login here would be nonsense.
+  var sess = null;
+  function loadSession(){
+    try {
+      var mine = JSON.parse(sessionStorage.getItem(KEY) || 'null');
+      if (mine && (mine.gh || mine.token)) return mine;
+    } catch(e){}
+    try {
+      for (var i=0;i<localStorage.length;i++){
+        var k = localStorage.key(i);
+        if (!k || !/cms[-.]?user/i.test(k)) continue;
+        var u = JSON.parse(localStorage.getItem(k) || 'null');
+        var t = u && (u.token || u.access_token || (u.data && u.data.token));
+        if (t) return { gh: String(t), via: 'cms' };
+      }
+    } catch(e){}
+    return null;
+  }
+  function saveSession(s){ sess = s; try{ sessionStorage.setItem(KEY, JSON.stringify(s)); }catch(e){} }
+  function headers(extra){
+    var h = extra || {};
+    if (sess && sess.gh) h['Authorization'] = 'Bearer ' + sess.gh;
+    else if (sess && sess.token) h['X-Admin-Token'] = sess.token;
+    return h;
+  }
+
+  // Same popup + postMessage handshake the CMS uses, against the same Netlify
+  // functions — so there is one OAuth app and one thing to keep working.
+  function signIn(){
+    var msg = $('gate-msg');
+    msg.textContent = 'Opening GitHub…';
+    var w = 680, h = 720;
+    var pop = window.open('/.netlify/functions/auth',
+      'whrnxt-oauth',
+      'width='+w+',height='+h+',left='+Math.max(0,(screen.width-w)/2)+',top='+Math.max(0,(screen.height-h)/2));
+    if (!pop) { msg.textContent = 'Your browser blocked the popup. Allow popups for this site and try again.'; return; }
+    var done = false;
+    function onMsg(e){
+      if (typeof e.data !== 'string') return;
+      if (e.data.indexOf('authorizing:github') === 0) { pop.postMessage(e.data, e.origin); return; }
+      var m = e.data.match(/^authorization:github:(success|error):(.+)$/);
+      if (!m) return;
+      done = true;
+      window.removeEventListener('message', onMsg);
+      try { pop.close(); } catch(_){}
+      var payload = {};
+      try { payload = JSON.parse(m[2]); } catch(_){}
+      if (m[1] !== 'success' || !payload.token) {
+        msg.textContent = payload.error || 'GitHub did not return a token.';
+        return;
+      }
+      saveSession({ gh: payload.token, via: 'github' });
+      start();
+    }
+    window.addEventListener('message', onMsg);
+    // A popup closed by hand leaves the listener hanging otherwise.
+    var poll = setInterval(function(){
+      if (done) { clearInterval(poll); return; }
+      if (pop.closed) { clearInterval(poll); window.removeEventListener('message', onMsg); msg.textContent = 'Sign-in window closed.'; }
+    }, 700);
+  }
+
+  // ── sections ──────────────────────────────────────────────────────────────
+  // Adding one is adding an entry here. Users is stubbed deliberately, so the
+  // shape is ready before there is anything to put in it.
+  var QUEUES = {
+    trips:  { queue:'/api/trips/queue',              moderate:function(id){return '/api/trips/'+encodeURIComponent(id)+'/moderate';},              list:'trips',       noun:'trip'  },
+    places: { queue:'/api/place-submissions/queue',  moderate:function(id){return '/api/place-submissions/'+encodeURIComponent(id)+'/moderate';},  list:'submissions', noun:'place' }
+  };
+  var SECTIONS = {
+    overview: { title:'Overview',           sub:'What is waiting, and what is in the database.' },
+    trips:    { title:'Shared trips',       sub:'Links people submitted. Approving one puts it on /trips/.' },
+    places:   { title:'Place submissions',  sub:'From /add-place/. Approving marks it ready for tools/promote_submissions.js, which resolves the real location and writes it into the data files.' },
+    users:    { title:'Users',              sub:'Not built yet.' }
+  };
+
+  var section = 'overview';
+  var status  = 'pending';
+  var summary = null;
+  var busy    = false;
+
+  function say(t, kind){ var m=$('msg'); m.textContent = t||''; m.className = 'msg' + (kind?(' '+kind):''); }
+
+  function api(path, opts){
+    opts = opts || {};
+    opts.headers = headers(opts.headers);
+    return fetch(API + path, opts).then(function(r){
+      if (r.status === 401) { var e = new Error('Not authorised. Your GitHub account must be listed in ADMIN_GITHUB_USERS on the API.'); e.auth = true; throw e; }
+      if (!r.ok) throw new Error('The server returned ' + r.status + '.');
+      return r.json();
+    });
+  }
+
+  function when(iso){
+    if (!iso) return 'recently';
+    var d = new Date(iso); if (isNaN(d)) return 'recently';
+    var mins = Math.round((Date.now() - d.getTime())/60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm ago';
+    if (mins < 1440) return Math.round(mins/60) + 'h ago';
+    return d.toLocaleDateString();
+  }
+  function safeHref(raw){
+    var s = String(raw||'').trim();
+    try { var u = new URL(s); return (u.protocol==='https:'||u.protocol==='http:') ? u.toString() : ''; }
+    catch(e){ return ''; }
+  }
+
+  function render(){
+    var def = SECTIONS[section];
+    $('sec-title').textContent = def.title;
+    $('sec-sub').textContent = def.sub;
+    document.querySelectorAll('.navb[data-sec]').forEach(function(b){
+      b.classList.toggle('on', b.getAttribute('data-sec') === section);
+    });
+    show($('tabs'), section === 'trips' || section === 'places');
+    if (section === 'overview') return renderOverview();
+    if (section === 'users')    return renderUsers();
+    return renderQueue();
+  }
+
+  function renderOverview(){
+    var b = $('body');
+    if (!summary) { b.innerHTML = '<div class="empty">Loading…</div>'; return; }
+    var t = summary.trips || {}, p = summary.places || {}, d = summary.database || {};
+    var waiting = (t.pending||0) + (p.pending||0);
+    b.innerHTML =
+      '<div class="cards">' +
+        stat(t.pending||0, 'trips waiting', (t.pending||0)>0) +
+        stat(p.pending||0, 'places waiting', (p.pending||0)>0) +
+        stat((t.approved||0), 'trips approved') +
+        stat((p.approved||0), 'places approved') +
+      '</div>' +
+      '<div class="cards">' +
+        stat((d.total||0).toLocaleString(), 'places in the database') +
+        stat((d.cities||0).toLocaleString(), 'cities') +
+        stat((d.confirmed||0).toLocaleString(), 'location confirmed') +
+        stat((d.unpinned||0).toLocaleString(), 'without a Google id', (d.unpinned||0)>0) +
+      '</div>' +
+      (waiting
+        ? '<div class="row"><h3>' + waiting + ' item' + (waiting===1?'':'s') + ' waiting for you</h3>' +
+          '<p>Nothing reaches the site or the app until it is approved.</p>' +
+          '<div class="acts">' +
+            ((t.pending||0) ? '<button class="btn btn-signal" data-go="trips">Review trips</button>' : '') +
+            ((p.pending||0) ? '<button class="btn btn-signal" data-go="places">Review places</button>' : '') +
+          '</div></div>'
+        : '<div class="empty">Nothing waiting. Both queues are clear.</div>');
+  }
+  function stat(v, label, attn){
+    return '<div class="stat' + (attn?' attn':'') + '"><b>' + esc(String(v)) + '</b><span>' + esc(label) + '</span></div>';
+  }
+
+  function renderUsers(){
+    $('body').innerHTML =
+      '<div class="soon"><p style="margin:0 0 8px"><strong style="color:var(--ink)">No user accounts yet.</strong></p>' +
+      '<p style="margin:0">WHRNXT needs no login — trips and saved places live on the device, which is why there is nothing here. ' +
+      'When that changes this is where accounts would be listed, and the sections either side of it already work the same way, ' +
+      'so adding one is adding an entry rather than rebuilding the screen.</p></div>';
+  }
+
+  function renderQueue(){
+    var b = $('body');
+    var q = QUEUES[section];
+    $('tabs').innerHTML = ['pending','approved','rejected'].map(function(s){
+      return '<button class="tab' + (s===status?' on':'') + '" data-status="' + s + '">' +
+        s.charAt(0).toUpperCase() + s.slice(1) + '</button>';
+    }).join('');
+    if (busy) { b.innerHTML = '<div class="empty">Loading…</div>'; return; }
+    var items = (renderQueue.data || {})[q.list] || [];
+    if (!items.length) {
+      b.innerHTML = '<div class="empty">' +
+        (status === 'pending'
+          ? 'Nothing waiting. New ' + q.noun + 's land here for review.'
+          : 'No ' + status + ' ' + q.noun + 's.') + '</div>';
+      return;
+    }
+    b.innerHTML = items.map(section === 'trips' ? tripRow : placeRow).join('');
+  }
+
+  function tripRow(t){
+    var href = safeHref(t.link);
+    return '<div class="row" data-id="' + esc(t.id) + '">' +
+      (t.cities ? '<span class="label">' + esc(t.cities) + '</span>' : '') +
+      '<h3>' + esc(t.title) + '</h3>' +
+      (t.note ? '<p>' + esc(t.note) + '</p>' : '') +
+      '<p class="meta">' + (href
+        ? '<a href="' + esc(href) + '" target="_blank" rel="nofollow noopener noreferrer">' + esc(href) + '</a>'
+        : esc(String(t.link||'')) + ' (not a usable link)') + '</p>' +
+      '<p class="meta">' + when(t.created_at) + ' · id ' + esc(t.id) + '</p>' +
+      acts(t.id) + '</div>';
+  }
+  function placeRow(p){
+    var maps = (p.lat != null && p.lng != null)
+      ? '<a href="https://www.google.com/maps/search/?api=1&query=' + p.lat + ',' + p.lng + '" target="_blank" rel="nofollow noopener noreferrer">' + Number(p.lat).toFixed(5) + ', ' + Number(p.lng).toFixed(5) + '</a>'
+      : '<a href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent((p.name||'') + ' ' + (p.city||'')) + '" target="_blank" rel="nofollow noopener noreferrer">no coordinates — look it up</a>';
+    return '<div class="row" data-id="' + esc(p.id) + '">' +
+      '<span class="label">' + esc(p.city) + (p.category ? ' · ' + esc(p.category) : '') + '</span>' +
+      '<h3>' + esc(p.name) + '</h3>' +
+      (p.note ? '<p>' + esc(p.note) + '</p>' : '') +
+      '<p class="meta">' + maps + '</p>' +
+      '<p class="meta">' + when(p.created_at) + ' · id ' + esc(p.id) + '</p>' +
+      acts(p.id) + '</div>';
+  }
+  function acts(id){
+    return '<div class="acts">' +
+      (status !== 'approved' ? '<button class="btn btn-signal" data-act="approved" data-id="' + esc(id) + '">Approve</button>' : '') +
+      (status !== 'rejected' ? '<button class="btn btn-ghost" data-act="rejected" data-id="' + esc(id) + '">' + (status==='approved'?'Take down':'Reject') + '</button>' : '') +
+      '</div>';
+  }
+
+  function load(){
+    if (section === 'users') { render(); return; }
+    if (section === 'overview') {
+      render();
+      return api('/api/admin/summary').then(function(d){
+        summary = d; updatePills(); render(); say('');
+      }).catch(fail);
+    }
+    busy = true; render(); say('Loading…');
+    return api(QUEUES[section].queue + '?status=' + encodeURIComponent(status)).then(function(d){
+      busy = false; renderQueue.data = d; render(); say('');
+    }).catch(function(e){ busy = false; fail(e); });
+  }
+
+  function updatePills(){
+    if (!summary) return;
+    [['trips','pill-trips'],['places','pill-places']].forEach(function(pair){
+      var n = ((summary[pair[0]]||{}).pending) || 0;
+      var el = $(pair[1]);
+      el.textContent = n; el.hidden = n === 0;
+    });
+  }
+
+  function fail(e){
+    say(e.message || 'Something went wrong.', 'bad');
+    if (e.auth) { $('body').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }
+  }
+
+  function moderate(id, next, row, btn){
+    row.querySelectorAll('button').forEach(function(b){ b.disabled = true; });
+    btn.textContent = next === 'approved' ? 'Approving…' : 'Rejecting…';
+    api(QUEUES[section].moderate(id), {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status: next })
+    }).then(function(){
+      row.classList.add('gone');
+      say(next === 'approved'
+        ? (section === 'trips'
+            ? 'Approved — it is live on /trips/ now.'
+            : 'Approved — run tools/promote_submissions.js to pull its real location and add it.')
+        : 'Rejected.', 'good');
+      setTimeout(function(){ row.remove(); if (!$('body').querySelector('.row')) load(); }, 260);
+      api('/api/admin/summary').then(function(d){ summary = d; updatePills(); }).catch(function(){});
+    }).catch(function(e){
+      row.querySelectorAll('button').forEach(function(b){ b.disabled = false; });
+      btn.textContent = next === 'approved' ? 'Approve' : 'Reject';
+      fail(e);
+    });
+  }
+
+  // ── wiring ────────────────────────────────────────────────────────────────
+  document.addEventListener('click', function(e){
+    var nav = e.target.closest('.navb[data-sec]');
+    if (nav) { section = nav.getAttribute('data-sec'); status = 'pending'; renderQueue.data = null; load(); return; }
+    var go = e.target.closest('[data-go]');
+    if (go) { section = go.getAttribute('data-go'); status = 'pending'; renderQueue.data = null; load(); return; }
+    var tab = e.target.closest('.tab[data-status]');
+    if (tab) { status = tab.getAttribute('data-status'); renderQueue.data = null; load(); return; }
+    var act = e.target.closest('[data-act]');
+    if (act) { moderate(act.getAttribute('data-id'), act.getAttribute('data-act'), act.closest('.row'), act); return; }
+  });
+  $('refresh').addEventListener('click', function(){ load(); });
+  $('signin').addEventListener('click', signIn);
+  $('tok-go').addEventListener('click', function(){
+    var v = $('tok').value.trim();
+    if (!v) { $('gate-msg').textContent = 'Paste the token first.'; return; }
+    saveSession({ token: v, via: 'token' });
+    start();
+  });
+  $('signout').addEventListener('click', function(){
+    try { sessionStorage.removeItem(KEY); } catch(e){}
+    sess = null;
+    show($('shell'), false); show($('gate'), true);
+    // Deliberately does not touch the CMS session — that belongs to /admin/cms.
+    $('gate-msg').textContent = 'Signed out of the dashboard. The article editor keeps its own session.';
+  });
+
+  function start(){
+    sess = sess || loadSession();
+    if (!sess) { show($('gate'), true); show($('shell'), false); return; }
+    show($('gate'), false); show($('shell'), true);
+    $('whoami').textContent = sess.via === 'token' ? 'Signed in with admin token'
+      : (sess.via === 'cms' ? 'Signed in via the article editor' : 'Signed in with GitHub');
+    load();
+  }
+  start();
+})();
+</script>
+</body>
+</html>
