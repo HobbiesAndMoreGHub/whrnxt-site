@@ -100,6 +100,7 @@ eleventyExcludeFromCollections: true
     <p>Sign in with the GitHub account that owns the site.</p>
     <button class="btn btn-signal" id="signin">Sign in with GitHub</button>
     <p class="sub" id="gate-msg" style="margin:14px 0 0;font-size:13px"></p>
+    <pre id="gate-trace" hidden style="margin:10px 0 0;padding:10px;background:#0a0f17;border:1px solid var(--line);border-radius:8px;color:var(--muted);font-size:11.5px;white-space:pre-wrap;max-height:190px;overflow:auto"></pre>
     <details style="margin-top:16px">
       <summary style="color:var(--muted);font-size:13px;cursor:pointer">Use an admin token instead</summary>
       <p class="sub" style="margin:10px 0 8px;font-size:13px">For scripts, or if GitHub sign-in is unavailable.</p>
@@ -192,8 +193,15 @@ window.addEventListener('unhandledrejection', function (e) {
 
   // Same popup + postMessage handshake the CMS uses, against the same Netlify
   // functions — so there is one OAuth app and one thing to keep working.
+  var traceLines = [];
+  function trace(t){
+    traceLines.push(t);
+    var el = $('gate-trace');
+    if (el) { el.hidden = false; el.textContent = traceLines.join(String.fromCharCode(10)); }
+  }
   function signIn(){
     var msg = $('gate-msg');
+    traceLines = [];
     msg.textContent = 'Opening GitHub…';
     var w = 680, h = 720;
     var pop = window.open('/.netlify/functions/auth',
@@ -203,9 +211,20 @@ window.addEventListener('unhandledrejection', function (e) {
     var done = false;
     function onMsg(e){
       if (typeof e.data !== 'string') return;
-      if (e.data.indexOf('authorizing:github') === 0) { pop.postMessage(e.data, e.origin); return; }
-      var m = e.data.match(/^authorization:github:(success|error):(.+)$/);
-      if (!m) return;
+      trace('msg from ' + e.origin + ': ' + e.data.slice(0, 48));
+      if (e.data.indexOf('authorizing:github') === 0) {
+        // Reply to the window that actually sent this, not the handle from
+        // window.open. After the trip out to github.com and back the stored
+        // handle can no longer be posted to in some browsers, and the callback
+        // page waits forever for a reply that never arrives — which is exactly
+        // "it says Opening GitHub and nothing else happens".
+        var target = e.source || pop;
+        try { target.postMessage(e.data, e.origin === 'null' ? '*' : e.origin); }
+        catch (err) { trace('reply failed: ' + err.message); }
+        return;
+      }
+      var m = e.data.match(/^authorization:github:(success|error):([\s\S]+)$/);
+      if (!m) { trace('unrecognised message, ignoring'); return; }
       done = true;
       window.removeEventListener('message', onMsg);
       try { pop.close(); } catch(_){}
@@ -222,7 +241,13 @@ window.addEventListener('unhandledrejection', function (e) {
     // A popup closed by hand leaves the listener hanging otherwise.
     var poll = setInterval(function(){
       if (done) { clearInterval(poll); return; }
-      if (pop.closed) { clearInterval(poll); window.removeEventListener('message', onMsg); msg.textContent = 'Sign-in window closed.'; }
+      if (pop.closed) {
+        clearInterval(poll);
+        window.removeEventListener('message', onMsg);
+        msg.textContent = traceLines.length
+          ? 'The GitHub window closed before sign-in finished.'
+          : 'The GitHub window closed and sent nothing back. If you did authorise, check that the OAuth app callback URL points at this domain.';
+      }
     }, 700);
   }
 
