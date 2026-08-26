@@ -22,8 +22,17 @@ permalink: /plan/index.html
   <div class="panel-lg" id="p-step-input">
     <form id="plan-form" novalidate>
       <p hidden><label>Leave blank: <input name="website" tabindex="-1" autocomplete="off"></label></p>
-      <label class="f" for="p-title">Trip name <span class="fine">(optional)</span></label>
-      <input id="p-title" name="title" placeholder="Five days in Rome" maxlength="120">
+      <div class="form-row">
+        <div>
+          <label class="f" for="p-title">Trip name <span class="fine">(optional)</span></label>
+          <input id="p-title" name="title" placeholder="Five days in Rome" maxlength="120">
+        </div>
+        <div style="position:relative">
+          <label class="f" for="p-city">City <span class="fine">(optional)</span></label>
+          <input id="p-city" name="city" placeholder="Start typing — e.g. Rome" autocomplete="off" maxlength="160">
+        </div>
+      </div>
+      <p class="fine" id="p-city-hint">Matched against the app. Leave it blank and the cities are read from your plan.</p>
       <label class="f" for="p-text" style="margin-top:12px">Your trip description</label>
       <textarea id="p-text" name="text" rows="12" required
         placeholder="Day 1 — Rome. Colosseum in the morning, then the Roman Forum and Palatine Hill. Lunch near Campo de' Fiori. Pantheon in the afternoon, Trevi Fountain after dark.&#10;&#10;Day 2 — Vatican Museums early, Sistine Chapel, St Peter's Basilica. Castel Sant'Angelo on the walk back."></textarea>
@@ -91,6 +100,7 @@ permalink: /plan/index.html
 
 {% if site.turnstileSiteKey %}<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>{% endif %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+{% include "citypicker.njk" %}
 {% raw %}<script>
 (function () {
   var API = {% endraw %}{{ site.apiUrl | dump | safe }}{% raw %};
@@ -99,6 +109,7 @@ permalink: /plan/index.html
 
   var form = document.getElementById('plan-form');
   if (!form) return;
+  if (window.whrnxtCityPicker) window.whrnxtCityPicker(document.getElementById('p-city'), { api: API });
   // form.elements.NAME rather than form.NAME: both work in browsers, but only
   // the former exists in jsdom, and being able to drive this page in a test
   // outside a browser is worth more than the shorter spelling.
@@ -161,6 +172,16 @@ permalink: /plan/index.html
         }
         trip = res.d;
         trip.days.forEach(function (d) { d.stops.forEach(function (s) { s.state = s.matched ? 'matched' : 'todo'; }); });
+        // Fill the box in from what the plan turned out to be about, so the city
+        // is right whether or not anyone typed one, and is still correctable.
+        var cityBox = $('p-city');
+        if (cityBox && !cityBox.value.trim()) {
+          var found = [];
+          trip.days.forEach(function (d) {
+            if (d.city && found.indexOf(d.city) === -1) found.push(d.city);
+          });
+          cityBox.value = found.join(' \u00b7 ');
+        }
         btn.disabled = false; btn.textContent = 'Check my trip ▸';
         msg.textContent = '';
         show('p-step-input', false); show('p-step-check', true);
@@ -357,8 +378,12 @@ permalink: /plan/index.html
     var box = $('p-share');
     var out = $('p-shared');
     if (!box || !box.checked) { if (out) out.hidden = true; return; }
+    // What is in the box wins: it has been matched against the app, and the
+    // user has had the chance to correct it.
+    var typed = ($('p-city') && $('p-city').value.trim()) || '';
     var cities = [];
-    days.forEach(function (d) { if (d.city && cities.indexOf(d.city) === -1) cities.push(d.city); });
+    if (typed) cities = typed.split(' \u00b7 ').map(function (c) { return c.trim(); }).filter(Boolean);
+    else days.forEach(function (d) { if (d.city && cities.indexOf(d.city) === -1) cities.push(d.city); });
     out.hidden = false;
     out.textContent = 'Submitting it to Shared trips…';
     fetch(API + '/api/trips', {
@@ -366,7 +391,7 @@ permalink: /plan/index.html
       body: JSON.stringify({
         title: trip.title || 'A WHRNXT trip',
         link: url,
-        cities: cities.slice(0, 4).join(', '),
+        cities: cities.slice(0, 4).join(' \u00b7 '),
         website: honeypot()
       })
     }).then(function (r) { return r.ok ? r.json() : null; })
