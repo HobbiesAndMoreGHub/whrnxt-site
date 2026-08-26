@@ -18,6 +18,7 @@ noindex: true
     <input id="rv-token" type="password" autocomplete="current-password" placeholder="Paste the ADMIN_TOKEN set on the API" required>
     <button class="btn btn-signal" type="submit" style="align-self:flex-start">Open queue &#9656;</button>
     <p class="fine">Held for this browser tab only, and never sent anywhere but the WHRNXT API. Closing the tab forgets it.</p>
+    <p class="fine">Or sign in at <a href="/admin/">/admin</a> with GitHub and come back — this page will use that session, no token needed. Your GitHub username has to be listed in <code>ADMIN_GITHUB_USERS</code> on the API.</p>
   </form>
 
   <div id="board" hidden>
@@ -38,6 +39,7 @@ noindex: true
       </div>
     </div>
 
+    <p class="fine" id="rv-how"></p>
     <p class="rv-msg" id="rv-msg" role="status" aria-live="polite"></p>
     <div class="trip-list" id="rv-list"></div>
   </div>
@@ -68,6 +70,33 @@ noindex: true
   var status = 'pending';
   var busy   = false;
 
+  // If you are signed into /admin, you are already signed in here. Decap stores
+  // its GitHub session under decap-cms-user, and localStorage is per origin —
+  // not per path — so this page can read the token /admin obtained without a
+  // second login. The API accepts it when the GitHub login is in
+  // ADMIN_GITHUB_USERS.
+  //
+  // The ADMIN_TOKEN box stays as the fallback: it is what scripts use, and it is
+  // the way in if the CMS session has expired or you never opened /admin.
+  function githubToken(){
+    try {
+      var raw = localStorage.getItem('decap-cms-user');
+      if (!raw) return '';
+      var u = JSON.parse(raw);
+      return (u && u.token) ? String(u.token) : '';
+    } catch (e) { return ''; }
+  }
+  // Header for whichever credential we have. GitHub first — it identifies a
+  // person rather than proving possession of a shared secret.
+  function authHeaders(extra){
+    var h = extra || {};
+    var gh = githubToken();
+    if (gh) h['Authorization'] = 'Bearer ' + gh;
+    else h['X-Admin-Token'] = token;
+    return h;
+  }
+  function signedInVia(){ return githubToken() ? 'github' : (token ? 'token' : ''); }
+
   function say(text, kind){
     msg.textContent = text || '';
     msg.className = 'rv-msg' + (kind ? ' is-' + kind : '');
@@ -82,6 +111,12 @@ noindex: true
   function showBoard(){
     gate.hidden = true;
     board.hidden = false;
+    var how = document.getElementById('rv-how');
+    if (how) {
+      how.textContent = signedInVia() === 'github'
+        ? 'Signed in through /admin (GitHub).'
+        : 'Signed in with the admin token.';
+    }
   }
 
   // Submissions are stranger-typed. Every value goes in as text, and a link is
@@ -237,7 +272,7 @@ noindex: true
     say('Loading…');
 
     fetch(API + ENDPOINT[kind].queue + '?status=' + encodeURIComponent(status), {
-      headers: { 'X-Admin-Token': token },
+      headers: authHeaders(),
     })
     .then(function(r){
       if(r.status === 401){
@@ -287,7 +322,7 @@ noindex: true
 
     fetch(API + ENDPOINT[kind].moderate(id), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ status: next }),
     })
     .then(function(r){
@@ -342,7 +377,10 @@ noindex: true
     tokenIn.value = '';
     list.replaceChildren();
     say('');
-    showGate();
+    // Only the pasted token is ours to forget. The GitHub session belongs to
+    // /admin — clearing it from here would silently sign you out of the CMS.
+    if (githubToken()) { say('Still signed in through /admin. Sign out there to end that session.'); load(); }
+    else showGate();
   });
 
   gate.addEventListener('submit', function(e){
@@ -352,6 +390,7 @@ noindex: true
     load();
   });
 
-  if(token) load(); else showGate();
+  // A GitHub session from /admin is enough on its own — no token to paste.
+  if (githubToken() || token) load(); else showGate();
 })();
 </script>{% endraw %}
