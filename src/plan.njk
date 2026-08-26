@@ -1,68 +1,92 @@
 ---
 layout: base.njk
 title: Text to trip
-description: Paste any trip description — an email, a blog post, a chat with an AI — and get a day-by-day WHRNXT itinerary link you can open on your phone.
+description: Paste any trip description — an email, a blog post, a chat with an AI — check the stops, and get a day-by-day WHRNXT itinerary link.
 permalink: /plan/index.html
 ---
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+
 <section class="block"><div class="wrap">
   <div class="sec-head">
     <span class="label">Build a trip</span>
     <h2>Paste a plan, get an itinerary.</h2>
-    <p>Anything that describes a trip works — an email from a friend, a blog post, a list of places, a plan an AI wrote for you. It comes back as a day-by-day WHRNXT link you can open on your phone, reorder, optimise for walking, and share.</p>
+    <p>Anything that describes a trip works — an email from a friend, a blog post, a list of places, a plan an AI wrote for you. You'll see which stops WHRNXT recognised before anything is saved, and can pin the ones it didn't.</p>
   </div>
 
   {% if not site.turnstileSiteKey %}<div class="plan-warn" style="border-color:#b8860b;margin-bottom:16px">
     <strong>Not live yet</strong>
-    <p class="fine">This form needs a Cloudflare Turnstile site key before it will work. Set <code>turnstileSiteKey</code> in <code>src/_data/site.json</code> and <code>TURNSTILE_SECRET</code> on the API. Until then the server refuses submissions on purpose.</p>
+    <p class="fine">This form needs a Cloudflare Turnstile site key before it will work. Set <code>turnstileSiteKey</code> in <code>src/_data/site.json</code> and <code>TURNSTILE_SECRET</code> on the API.</p>
   </div>{% endif %}
-  <div class="panel-lg">
+
+  <!-- STEP 1 — paste -->
+  <div class="panel-lg" id="p-step-input">
     <form id="plan-form" novalidate>
       <p hidden><label>Leave blank: <input name="website" tabindex="-1" autocomplete="off"></label></p>
-
       <label class="f" for="p-title">Trip name <span class="fine">(optional)</span></label>
       <input id="p-title" name="title" placeholder="Five days in Rome" maxlength="120">
-
       <label class="f" for="p-text" style="margin-top:12px">Your trip description</label>
       <textarea id="p-text" name="text" rows="12" required
         placeholder="Day 1 — Rome. Colosseum in the morning, then the Roman Forum and Palatine Hill. Lunch near Campo de' Fiori. Pantheon in the afternoon, Trevi Fountain after dark.&#10;&#10;Day 2 — Vatican Museums early, Sistine Chapel, St Peter's Basilica. Castel Sant'Angelo on the walk back."></textarea>
       <p class="fine" id="p-count">0 characters</p>
-
       <div id="p-captcha" style="margin:12px 0"></div>
-
-      <button class="btn btn-signal" type="submit" id="p-submit" style="align-self:flex-start">Build my trip &#9656;</button>
+      <button class="btn btn-signal" type="submit" id="p-submit" style="align-self:flex-start">Check my trip &#9656;</button>
     </form>
-
     <p class="fine" id="p-msg">Nothing is stored against you — no account, no login. The trip becomes a link you keep.</p>
+  </div>
 
-    <div id="p-result" hidden style="margin-top:18px">
-      <div class="plan-ok">
-        <span class="label">Your trip is ready</span>
-        <p class="fine" style="margin:6px 0 10px">Open it in WHRNXT, or copy the link and keep it. It works on any phone.</p>
-        <div class="form-row">
-          <a class="btn btn-signal" id="p-open" href="#" target="_blank" rel="noopener">Open in WHRNXT &#9656;</a>
-          <button class="btn" type="button" id="p-copy">Copy link</button>
-        </div>
-        <input id="p-url" readonly style="margin-top:10px" onclick="this.select()">
-      </div>
-
-      <div class="plan-warn" id="p-notinapp" hidden>
-        <strong id="p-notinapp-head"></strong>
-        <p class="fine">These stops aren't in WHRNXT's place database yet, so they were pinned from their address rather than a checked location. They'll work in your trip — but the pin may be a street or a rooftop rather than the door. Worth a look on the map, and you can send them to us to add properly.</p>
-        <ul class="plan-list" id="p-notinapp-list"></ul>
-        <a class="browse" href="/add-place/">Add a missing place &#9656;</a>
-      </div>
-
-      <div class="plan-warn" id="p-warnings" hidden>
-        <strong>A few things to know</strong>
-        <ul class="plan-list" id="p-warnings-list"></ul>
-      </div>
+  <!-- STEP 2 — reconcile -->
+  <div class="panel-lg" id="p-step-check" hidden>
+    <span class="label">Check the stops</span>
+    <h2 id="p-check-head">Almost there.</h2>
+    <p class="fine" id="p-check-sub"></p>
+    <div class="rec-legend" id="p-legend"></div>
+    <div id="p-list"></div>
+    <div class="plan-warn" id="p-warnings" hidden>
+      <strong>A few things to know</strong>
+      <ul class="plan-list" id="p-warnings-list"></ul>
+    </div>
+    <div class="form-row" style="margin-top:14px">
+      <button class="btn btn-signal" type="button" id="p-build">Save trip &amp; get link</button>
+      <button class="btn" type="button" id="p-restart">Start over</button>
     </div>
   </div>
 
-  <p class="fine" style="margin-top:14px">Already built a trip in the app? <a href="/#share">Share it with other travellers</a>.</p>
+  <!-- STEP 3 — link -->
+  <div class="panel-lg" id="p-step-done" hidden>
+    <div class="plan-ok">
+      <span class="label">Your trip is ready</span>
+      <p class="fine" style="margin:6px 0 10px">Open it in WHRNXT, or copy the link and keep it. It works on any phone.</p>
+      <div class="form-row">
+        <a class="btn btn-signal" id="p-open" href="#" target="_blank" rel="noopener">Open in WHRNXT &#9656;</a>
+        <button class="btn" type="button" id="p-copy">Copy link</button>
+      </div>
+      <input id="p-url" readonly style="margin-top:10px" onclick="this.select()">
+    </div>
+    <button class="btn" type="button" id="p-again" style="margin-top:12px">Build another</button>
+  </div>
 </div></section>
 
+<!-- Pin picker, shown over the page while setting one stop's location -->
+<div id="p-pick" class="pick-back" hidden>
+  <div class="pick-card">
+    <div class="pick-head">
+      <strong id="p-pick-title">Set the location</strong>
+      <button class="btn" type="button" id="p-pick-close">Close</button>
+    </div>
+    <p class="fine" id="p-pick-hint">Search for it, or tap the map to drop a pin. Drag the pin to fine-tune.</p>
+    <div style="display:flex;gap:8px">
+      <input id="p-pick-q" placeholder="Search a place or address" autocomplete="off" style="flex:1">
+      <button class="btn" type="button" id="p-pick-find">Find</button>
+    </div>
+    <ul id="p-pick-suggest" class="find-suggest" style="display:none"></ul>
+    <div id="p-pick-map"></div>
+    <p class="fine" id="p-pick-at"></p>
+    <button class="btn btn-signal" type="button" id="p-pick-use" style="width:100%">Use this location</button>
+  </div>
+</div>
+
 {% if site.turnstileSiteKey %}<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>{% endif %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 {% raw %}<script>
 (function () {
   var API = {% endraw %}{{ site.apiUrl | dump | safe }}{% raw %};
@@ -70,119 +94,270 @@ permalink: /plan/index.html
   var MAX = 12000;
 
   var form = document.getElementById('plan-form');
+  if (!form) return;
+  // form.elements.NAME rather than form.NAME: both work in browsers, but only
+  // the former exists in jsdom, and being able to drive this page in a test
+  // outside a browser is worth more than the shorter spelling.
+  function honeypot() { var f = form.elements.website; return f ? f.value : ''; }
   var text = document.getElementById('p-text');
-  var count = document.getElementById('p-count');
   var msg = document.getElementById('p-msg');
   var btn = document.getElementById('p-submit');
-  var result = document.getElementById('p-result');
   var widgetId = null;
+  var trip = null;          // { title, days:[{label,city,citySlug,date,stops:[...]}] }
+  var pickTarget = null;    // { di, si } while the pin picker is open
+  var map = null, marker = null, picked = null, suggestions = [], sTimer = null;
 
-  if (!form) return;
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+  function show(id, on) { var e = $(id); if (e) e.hidden = !on; }
 
-  text.addEventListener('input', function () {
+  document.getElementById('p-text').addEventListener('input', function () {
     var n = text.value.length;
-    count.textContent = n.toLocaleString() + ' characters' + (n > MAX ? ' — too long, trim it down' : '');
-    count.style.color = n > MAX ? '#ff9b9b' : '';
+    $('p-count').textContent = n.toLocaleString() + ' characters' + (n > MAX ? ' — too long, trim it down' : '');
+    $('p-count').style.color = n > MAX ? '#ff9b9b' : '';
   });
 
-  // Rendered explicitly so the token can be reset after every submit: a
-  // Turnstile token is single-use, and a second submit with a spent token is
-  // rejected by Cloudflare, not by us.
-  window.onloadTurnstileCallback = function () {
-    if (!SITE_KEY || !window.turnstile) return;
-    widgetId = window.turnstile.render('#p-captcha', { sitekey: SITE_KEY });
-  };
   if (SITE_KEY) {
     var t = setInterval(function () {
-      if (window.turnstile) { clearInterval(t); window.onloadTurnstileCallback(); }
+      if (window.turnstile) { clearInterval(t); widgetId = window.turnstile.render('#p-captcha', { sitekey: SITE_KEY }); }
     }, 150);
     setTimeout(function () { clearInterval(t); }, 15000);
   }
 
-  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
-  function show(el, on) { el.hidden = !on; }
-
   function fail(m) {
-    msg.textContent = m;
-    msg.style.color = '#ff9b9b';
-    btn.disabled = false;
-    btn.textContent = 'Build my trip ▸';
+    msg.textContent = m; msg.style.color = '#ff9b9b';
+    btn.disabled = false; btn.textContent = 'Check my trip ▸';
     if (widgetId !== null && window.turnstile) window.turnstile.reset(widgetId);
   }
 
+  // ── step 1: analyse ───────────────────────────────────────────────────────
   form.addEventListener('submit', function (e) {
     e.preventDefault();
     var body = text.value.trim();
     if (!body) return fail('Paste a trip description first.');
     if (body.length > MAX) return fail('That is too long — keep it under ' + MAX.toLocaleString() + ' characters.');
-
     var token = '';
     if (SITE_KEY) {
       token = (widgetId !== null && window.turnstile) ? window.turnstile.getResponse(widgetId) : '';
       if (!token) return fail('Complete the verification box first.');
     }
-
-    msg.style.color = '';
-    msg.textContent = 'Reading your plan and matching places… this takes a few seconds.';
-    btn.disabled = true;
-    btn.textContent = 'Building…';
-    show(result, false);
+    msg.style.color = ''; msg.textContent = 'Reading your plan and matching places… this takes a few seconds.';
+    btn.disabled = true; btn.textContent = 'Checking…';
 
     fetch(API + '/api/web/from-text', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        text: body,
-        title: document.getElementById('p-title').value.trim(),
-        captchaToken: token,
-        website: form.website.value
+        text: body, title: $('p-title').value.trim(),
+        analyze: true, captchaToken: token, website: honeypot()
       })
-    }).then(function (r) {
-      return r.json().then(function (d) { return { ok: r.ok, d: d }; });
-    }).then(function (res) {
-      if (!res.ok || !res.d || !res.d.url) {
-        return fail((res.d && res.d.message) || 'Could not build that trip. Try adding day headings and place names.');
-      }
-      var d = res.d;
-      document.getElementById('p-open').href = d.url;
-      document.getElementById('p-url').value = d.url;
-
-      var nia = d.notInApp || [];
-      var niaBox = document.getElementById('p-notinapp');
-      if (nia.length) {
-        document.getElementById('p-notinapp-head').textContent =
-          nia.length + (nia.length === 1 ? ' stop is not in WHRNXT yet' : ' stops are not in WHRNXT yet');
-        document.getElementById('p-notinapp-list').innerHTML = nia.map(function (p) {
-          var where = p.city ? ' <span class="fine">' + esc(p.city) + '</span>' : '';
-          var co = (p.lat != null && p.lng != null)
-            ? ' <span class="fine">' + p.lat.toFixed(4) + ', ' + p.lng.toFixed(4) + '</span>' : '';
-          return '<li>' + esc(p.name) + where + co + '</li>';
-        }).join('');
-      }
-      show(niaBox, nia.length > 0);
-
-      var warn = (d.warnings || []).filter(Boolean);
-      var warnBox = document.getElementById('p-warnings');
-      if (warn.length) {
-        document.getElementById('p-warnings-list').innerHTML = warn.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('');
-      }
-      show(warnBox, warn.length > 0);
-
-      show(result, true);
-      msg.textContent = 'Done. The link below is yours to keep or share.';
-      btn.disabled = false;
-      btn.textContent = 'Build another ▸';
-      if (widgetId !== null && window.turnstile) window.turnstile.reset(widgetId);
-      result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }).catch(function () {
-      fail('Could not reach the server. Check your connection and try again.');
-    });
+    }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.d || !Array.isArray(res.d.days) || !res.d.days.length) {
+          return fail((res.d && res.d.message) || 'Could not read that as a trip. Try adding day headings and place names.');
+        }
+        trip = res.d;
+        trip.days.forEach(function (d) { d.stops.forEach(function (s) { s.state = s.matched ? 'matched' : 'todo'; }); });
+        btn.disabled = false; btn.textContent = 'Check my trip ▸';
+        msg.textContent = '';
+        show('p-step-input', false); show('p-step-check', true);
+        renderList();
+        $('p-step-check').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }).catch(function () { fail('Could not reach the server. Check your connection and try again.'); });
   });
 
-  document.getElementById('p-copy').addEventListener('click', function () {
-    var f = document.getElementById('p-url');
-    f.select();
-    var done = function () { var b = document.getElementById('p-copy'); b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy link'; }, 1600); };
+  // ── step 2: the reconciliation list ───────────────────────────────────────
+  function counts() {
+    var c = { matched: 0, todo: 0, fixed: 0, skipped: 0 };
+    trip.days.forEach(function (d) { d.stops.forEach(function (s) { c[s.state]++; }); });
+    return c;
+  }
+  // Search using what the user actually wrote, not the resolved name — the
+  // wording they chose is usually why a place is findable.
+  function searchUrl(day, stop) {
+    return 'https://www.google.com/search?q=' + encodeURIComponent([stop.wrote || stop.name, day.city].filter(Boolean).join(' '));
+  }
+
+  function renderList() {
+    var c = counts();
+    $('p-check-head').textContent = c.todo ? 'Some stops need a look' : 'Everything matched';
+    $('p-check-sub').textContent = c.todo
+      ? c.todo + (c.todo === 1 ? ' stop was' : ' stops were') + ' placed from an address only, so the pin may be the street rather than the door. Pin them properly, skip them, or save as they are.'
+      : 'Every stop matched a place WHRNXT already knows.';
+    $('p-legend').innerHTML =
+      '<span class="rec-chip rec-ok">✓ matched ' + c.matched + '</span>' +
+      (c.fixed ? '<span class="rec-chip rec-ok">✓ pinned ' + c.fixed + '</span>' : '') +
+      (c.todo ? '<span class="rec-chip rec-todo">needs a look ' + c.todo + '</span>' : '') +
+      (c.skipped ? '<span class="rec-chip rec-skip">skipped ' + c.skipped + '</span>' : '');
+
+    var html = '';
+    trip.days.forEach(function (day, di) {
+      html += '<div class="rec-day"><span class="rec-day-label">' + esc(day.label) + '</span>' +
+              (day.city ? '<span class="rec-day-city">' + esc(day.city) + '</span>' : '') + '</div>';
+      day.stops.forEach(function (s, si) {
+        var k = ' data-di="' + di + '" data-si="' + si + '"';
+        if (s.state === 'matched' || s.state === 'fixed') {
+          html += '<div class="rec-row"><span class="rec-mark rec-ok">✓</span><span class="rec-name">' + esc(s.name) +
+            (s.state === 'fixed' ? '<span class="rec-sub">pinned by you</span>' : '') + '</span>' +
+            (s.state === 'fixed' ? '<button class="btn rec-btn" data-act="fix"' + k + '>Change</button>' : '') + '</div>';
+        } else if (s.state === 'skipped') {
+          html += '<div class="rec-row"><span class="rec-mark rec-skip">—</span><span class="rec-name rec-struck">' + esc(s.name) +
+            '</span><button class="btn rec-btn" data-act="undo"' + k + '>Undo</button></div>';
+        } else {
+          html += '<div class="rec-row"><span class="rec-mark rec-todo">?</span>' +
+            '<span class="rec-name">' + esc(s.name) + '<span class="rec-sub">not in WHRNXT — pinned from its address</span></span>' +
+            '<div class="rec-actions">' +
+              '<a class="btn rec-btn" href="' + esc(searchUrl(day, s)) + '" target="_blank" rel="noopener">🔍 Google</a>' +
+              '<button class="btn rec-btn" data-act="fix"' + k + '>Set location</button>' +
+              '<button class="btn rec-btn" data-act="skip"' + k + '>Skip</button>' +
+            '</div></div>';
+        }
+      });
+    });
+    $('p-list').innerHTML = html;
+
+    var warn = (trip.warnings || []).filter(Boolean);
+    if (warn.length) $('p-warnings-list').innerHTML = warn.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('');
+    show('p-warnings', warn.length > 0);
+
+    var keeping = 0;
+    trip.days.forEach(function (d) { d.stops.forEach(function (s) { if (s.state !== 'skipped') keeping++; }); });
+    $('p-build').textContent = 'Save trip & get link (' + keeping + ' stop' + (keeping === 1 ? '' : 's') + ')';
+    $('p-build').disabled = keeping === 0;
+  }
+
+  $('p-list').addEventListener('click', function (e) {
+    var el = e.target.closest('[data-act]');
+    if (!el) return;
+    var di = +el.getAttribute('data-di'), si = +el.getAttribute('data-si');
+    var s = trip.days[di].stops[si];
+    var act = el.getAttribute('data-act');
+    if (act === 'skip') { s.prev = s.state; s.state = 'skipped'; renderList(); }
+    else if (act === 'undo') { s.state = s.prev || 'todo'; s.prev = null; renderList(); }
+    else if (act === 'fix') openPicker(di, si);
+  });
+
+  // ── the pin picker ────────────────────────────────────────────────────────
+  function openPicker(di, si) {
+    var day = trip.days[di], s = day.stops[si];
+    pickTarget = { di: di, si: si };
+    picked = { lat: s.latitude, lng: s.longitude, name: s.name };
+    $('p-pick-title').textContent = 'Set the location — ' + s.name;
+    $('p-pick-q').value = s.wrote || s.name;
+    $('p-pick-suggest').style.display = 'none';
+    show('p-pick', true);
+    setTimeout(function () { buildMap(); }, 30);
+  }
+  function closePicker() {
+    show('p-pick', false);
+    pickTarget = null;
+    if (map) { map.remove(); map = null; marker = null; }
+  }
+  function setPin(lat, lng, label) {
+    picked = { lat: lat, lng: lng, name: (picked && picked.name) || '' };
+    $('p-pick-at').textContent = (label ? label + ' — ' : '') + lat.toFixed(6) + ', ' + lng.toFixed(6);
+    if (!map) return;
+    if (!marker) {
+      marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+      marker.on('dragend', function () { var p = marker.getLatLng(); setPin(p.lat, p.lng, 'dragged'); });
+    } else marker.setLatLng([lat, lng]);
+  }
+  function buildMap() {
+    var el = $('p-pick-map');
+    if (!el || typeof L === 'undefined') return;
+    if (map) { map.remove(); map = null; marker = null; }
+    map = L.map(el, { zoomControl: true });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
+    var lat = (picked && picked.lat != null) ? picked.lat : 41.9, lng = (picked && picked.lng != null) ? picked.lng : 12.5;
+    map.setView([lat, lng], picked && picked.lat != null ? 16 : 5);
+    map.on('click', function (e) { setPin(e.latlng.lat, e.latlng.lng, 'dropped'); });
+    setTimeout(function () { if (map) map.invalidateSize(); }, 60);
+    setPin(lat, lng, 'from the import');
+  }
+  // Same Google Places search the app uses, so the suggestions are the real ones.
+  function runSuggest() {
+    var q = $('p-pick-q').value.trim();
+    if (q.length < 3) { $('p-pick-suggest').style.display = 'none'; return; }
+    var day = trip.days[pickTarget.di];
+    fetch(API + '/api/placesearch?q=' + encodeURIComponent(q + ', ' + (day.city || '')))
+      .then(function (r) { return r.ok ? r.json() : { suggestions: [] }; })
+      .then(function (d) {
+        suggestions = d.suggestions || [];
+        var box = $('p-pick-suggest');
+        if (!suggestions.length) { box.style.display = 'none'; return; }
+        box.innerHTML = suggestions.map(function (s, i) {
+          return '<li class="find-suggest-item" data-sg="' + i + '"><span class="find-suggest-name">' + esc(s.name) +
+                 '</span><span class="find-suggest-sub">' + esc(s.secondary) + '</span></li>';
+        }).join('');
+        box.style.display = '';
+      }).catch(function () { $('p-pick-suggest').style.display = 'none'; });
+  }
+  $('p-pick-q').addEventListener('input', function () { clearTimeout(sTimer); sTimer = setTimeout(runSuggest, 350); });
+  $('p-pick-find').addEventListener('click', runSuggest);
+  $('p-pick-suggest').addEventListener('click', function (e) {
+    var li = e.target.closest('[data-sg]');
+    if (!li) return;
+    var s = suggestions[+li.getAttribute('data-sg')];
+    $('p-pick-suggest').style.display = 'none';
+    fetch(API + '/api/place?id=' + encodeURIComponent(s.placeId))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d || typeof d.lat !== 'number') return;
+        picked = { lat: d.lat, lng: d.lng, name: s.name };
+        if (map) map.setView([d.lat, d.lng], 17);
+        setPin(d.lat, d.lng, s.name);
+      }).catch(function () {});
+  });
+  $('p-pick-close').addEventListener('click', closePicker);
+  $('p-pick-use').addEventListener('click', function () {
+    if (!pickTarget || !picked) return closePicker();
+    var s = trip.days[pickTarget.di].stops[pickTarget.si];
+    s.latitude = picked.lat; s.longitude = picked.lng;
+    if (picked.name) s.name = picked.name;
+    s.state = 'fixed';
+    closePicker();
+    renderList();
+  });
+
+  // ── step 3: build the link from the corrected trip ────────────────────────
+  $('p-build').addEventListener('click', function () {
+    var days = trip.days.map(function (d) {
+      return {
+        label: d.label, city: d.city, date: d.date || undefined,
+        stops: d.stops.filter(function (s) { return s.state !== 'skipped'; })
+          .map(function (s) { return { name: s.name, latitude: s.latitude, longitude: s.longitude, category: s.category }; })
+      };
+    }).filter(function (d) { return d.stops.length; });
+    if (!days.length) return;
+
+    var b = $('p-build');
+    b.disabled = true; b.textContent = 'Saving…';
+    fetch(API + '/api/itineraries/import', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: trip.title, days: days })
+    }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        b.disabled = false; b.textContent = 'Save trip & get link';
+        if (!res.ok || !res.d || !res.d.url) { $('p-check-sub').textContent = (res.d && res.d.message) || 'Could not save that trip. Try again.'; return; }
+        $('p-open').href = res.d.url;
+        $('p-url').value = res.d.url;
+        show('p-step-check', false); show('p-step-done', true);
+        $('p-step-done').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }).catch(function () { b.disabled = false; b.textContent = 'Save trip & get link'; });
+  });
+
+  function restart() {
+    trip = null;
+    show('p-step-check', false); show('p-step-done', false); show('p-step-input', true);
+    msg.textContent = 'Nothing is stored against you — no account, no login. The trip becomes a link you keep.';
+    msg.style.color = '';
+    if (widgetId !== null && window.turnstile) window.turnstile.reset(widgetId);
+  }
+  $('p-restart').addEventListener('click', restart);
+  $('p-again').addEventListener('click', function () { text.value = ''; $('p-count').textContent = '0 characters'; restart(); });
+
+  $('p-copy').addEventListener('click', function () {
+    var f = $('p-url'); f.select();
+    var done = function () { var b = $('p-copy'); b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy link'; }, 1600); };
     if (navigator.clipboard) navigator.clipboard.writeText(f.value).then(done, done);
     else { try { document.execCommand('copy'); done(); } catch (e) {} }
   });

@@ -281,3 +281,31 @@ select{width:100%;background:#0d131d;border:1px solid var(--line);border-radius:
   color:var(--ink);padding:11px 12px;font:inherit}
 select:focus{outline:2px solid var(--signal);outline-offset:1px;border-color:var(--signal)}
 #p-url{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px}
+
+/* Trip reconciliation: every stop, matched or not, before the link is made. */
+.rec-legend{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px}
+.rec-chip{font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--dim,#8b95a5)}
+.rec-chip.rec-ok{color:#3fb950;border-color:#238636}
+.rec-chip.rec-todo{color:#d29922;border-color:#9e6a03}
+.rec-day{display:flex;align-items:baseline;gap:8px;margin:16px 0 4px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.rec-day-label{font-weight:700}
+.rec-day-city{font-size:12px;color:var(--dim,#8b95a5)}
+.rec-row{display:flex;align-items:flex-start;gap:9px;padding:9px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.rec-row:last-child{border-bottom:none}
+.rec-mark{flex:0 0 16px;text-align:center;font-weight:700;line-height:1.5}
+.rec-mark.rec-ok{color:#3fb950}.rec-mark.rec-todo{color:#d29922}.rec-mark.rec-skip{color:var(--dim,#8b95a5)}
+.rec-name{flex:1 1 10rem;line-height:1.35}
+.rec-name .rec-sub{display:block;font-size:12px;color:var(--dim,#8b95a5)}
+.rec-struck{text-decoration:line-through;color:var(--dim,#8b95a5)}
+.rec-actions{display:flex;gap:6px;flex-wrap:wrap}
+.rec-btn{padding:5px 10px;font-size:13px;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center}
+
+/* Pin picker overlay */
+.pick-back{position:fixed;inset:0;background:rgba(4,8,14,.72);z-index:900;display:flex;
+  align-items:center;justify-content:center;padding:16px}
+.pick-back[hidden]{display:none}
+.pick-card{background:var(--panel,#111823);border:1px solid var(--line);border-radius:14px;
+  padding:16px;width:100%;max-width:560px;max-height:92vh;overflow-y:auto}
+.pick-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+#p-pick-map{height:280px;border-radius:10px;margin-top:10px;background:#0d131d}
+#p-pick-at{margin:8px 0}
