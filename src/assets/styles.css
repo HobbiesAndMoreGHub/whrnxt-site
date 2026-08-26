@@ -37,7 +37,16 @@ header.nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(10px);
 .btn-ghost{background:transparent;color:var(--ink);border-color:var(--line)}
 .btn-ghost:hover{border-color:var(--muted)}
 .nav .btn{padding:9px 16px}
-@media(max-width:820px){.nav-links{display:none}}
+/* Below 820px the links used to be display:none outright, so a phone had no way
+   to reach anything but the footer's Articles link. They wrap onto their own row
+   instead, scrolling sideways if they still do not fit. */
+@media(max-width:820px){
+  .nav-in{flex-wrap:wrap;height:auto;padding:10px 0;gap:12px}
+  .nav-links{order:3;width:100%;margin-left:0;gap:18px;font-size:14px;
+    overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;white-space:nowrap}
+  .nav-links a{flex:0 0 auto}
+  .nav .btn{margin-left:auto}
+}
 
 /* hero */
 .hero{padding:76px 0 40px}
@@ -309,3 +318,9 @@ select:focus{outline:2px solid var(--signal);outline-offset:1px;border-color:var
 .pick-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
 #p-pick-map{height:280px;border-radius:10px;margin-top:10px;background:#0d131d}
 #p-pick-at{margin:8px 0}
+
+/* "share this trip" opt-out on the trip builder */
+.p-share{display:flex;gap:10px;align-items:flex-start;margin-top:16px;
+  padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:#0d131d;line-height:1.4}
+.p-share input{width:auto;margin-top:2px;flex:0 0 auto}
+.p-share .fine{display:block;margin-top:2px}

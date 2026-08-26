@@ -45,6 +45,9 @@ permalink: /plan/index.html
       <strong>A few things to know</strong>
       <ul class="plan-list" id="p-warnings-list"></ul>
     </div>
+    <label class="p-share"><input type="checkbox" id="p-share" checked>
+      <span>Share this trip on WHRNXT so other travellers can use it.
+      <span class="fine">A person reviews it before it appears on <a href="/trips/">Shared trips</a>. Untick to keep it to yourself.</span></span></label>
     <div class="form-row" style="margin-top:14px">
       <button class="btn btn-signal" type="button" id="p-build">Save trip &amp; get link</button>
       <button class="btn" type="button" id="p-restart">Start over</button>
@@ -61,6 +64,7 @@ permalink: /plan/index.html
         <button class="btn" type="button" id="p-copy">Copy link</button>
       </div>
       <input id="p-url" readonly style="margin-top:10px" onclick="this.select()">
+      <p class="fine" id="p-shared" style="margin-top:10px" hidden></p>
     </div>
     <button class="btn" type="button" id="p-again" style="margin-top:12px">Build another</button>
   </div>
@@ -340,10 +344,40 @@ permalink: /plan/index.html
         if (!res.ok || !res.d || !res.d.url) { $('p-check-sub').textContent = (res.d && res.d.message) || 'Could not save that trip. Try again.'; return; }
         $('p-open').href = res.d.url;
         $('p-url').value = res.d.url;
+        shareIfWanted(res.d.url, days);
         show('p-step-check', false); show('p-step-done', true);
         $('p-step-done').scrollIntoView({ behavior: 'smooth', block: 'start' });
       }).catch(function () { b.disabled = false; b.textContent = 'Save trip & get link'; });
   });
+
+  // Posts the finished link to the same moderated queue the front-page form
+  // uses. Deliberately fire-and-forget: the trip and its link already exist, and
+  // a failure to offer it for sharing must not read as a failure to build it.
+  function shareIfWanted(url, days) {
+    var box = $('p-share');
+    var out = $('p-shared');
+    if (!box || !box.checked) { if (out) out.hidden = true; return; }
+    var cities = [];
+    days.forEach(function (d) { if (d.city && cities.indexOf(d.city) === -1) cities.push(d.city); });
+    out.hidden = false;
+    out.textContent = 'Submitting it to Shared trips…';
+    fetch(API + '/api/trips', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: trip.title || 'A WHRNXT trip',
+        link: url,
+        cities: cities.slice(0, 4).join(', '),
+        website: honeypot()
+      })
+    }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        out.textContent = (d && d.ok)
+          ? 'Sent to Shared trips — a person reviews it before it goes public.'
+          : 'Your link is ready. Sharing it to the public list did not go through, but that does not affect your trip.';
+      }).catch(function () {
+        out.textContent = 'Your link is ready. Sharing it to the public list did not go through, but that does not affect your trip.';
+      });
+  }
 
   function restart() {
     trip = null;

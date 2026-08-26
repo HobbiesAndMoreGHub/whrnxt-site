@@ -2,7 +2,7 @@
 layout: base.njk
 title: Review queue
 permalink: /review/index.html
-description: Moderation queue for community-submitted trips.
+description: Moderation queue for community-submitted trips and places.
 sitemap: false
 noindex: true
 ---
@@ -10,7 +10,7 @@ noindex: true
   <div class="sec-head">
     <span class="label">Moderation</span>
     <h2>Review queue</h2>
-    <p>Trips people submitted from the front page. Nothing here is public until you approve it &mdash; approving puts it straight on the <a class="browse" href="/trips/">Shared trips</a> page.</p>
+    <p>Two queues. <strong>Trips</strong> are links people submitted, and approving one puts it on <a class="browse" href="/trips/">Shared trips</a>. <strong>Places</strong> are the city-and-name submissions from <a class="browse" href="/add-place/">Add a place</a>; approving one marks it ready for <code>tools/promote_submissions.js</code>, which resolves its real location and writes it into the data files. Nothing here is public until you approve it.</p>
   </div>
 
   <form id="gate" class="rv-gate" hidden>
@@ -22,6 +22,10 @@ noindex: true
 
   <div id="board" hidden>
     <div class="rv-bar">
+      <div class="rv-tabs" role="tablist" style="margin-right:14px">
+        <button class="mode-tab is-on" type="button" role="tab" data-kind="trips">Trips</button>
+        <button class="mode-tab" type="button" role="tab" data-kind="places">Places</button>
+      </div>
       <div class="rv-tabs" role="tablist">
         <button class="mode-tab is-on" type="button" role="tab" data-status="pending">Pending</button>
         <button class="mode-tab" type="button" role="tab" data-status="approved">Approved</button>
@@ -50,7 +54,15 @@ noindex: true
   var list    = document.getElementById('rv-list');
   var msg     = document.getElementById('rv-msg');
   var countEl = document.getElementById('rv-count');
-  var tabs    = Array.prototype.slice.call(document.querySelectorAll('.rv-tabs .mode-tab'));
+  var tabs    = Array.prototype.slice.call(document.querySelectorAll('.mode-tab[data-status]'));
+  var kindTabs = Array.prototype.slice.call(document.querySelectorAll('.mode-tab[data-kind]'));
+  // Two queues, one screen. Trips are links people submitted; places are the
+  // city + name submissions from /add-place/, which had no UI at all before.
+  var kind = 'trips';
+  var ENDPOINT = {
+    trips:  { queue: '/api/trips/queue', moderate: function(id){ return '/api/trips/' + encodeURIComponent(id) + '/moderate'; }, list: 'trips' },
+    places: { queue: '/api/place-submissions/queue', moderate: function(id){ return '/api/place-submissions/' + encodeURIComponent(id) + '/moderate'; }, list: 'submissions' }
+  };
 
   var token  = sessionStorage.getItem(KEY) || '';
   var status = 'pending';
@@ -131,16 +143,23 @@ noindex: true
     meta.textContent = 'Submitted ' + when(t.created_at) + '  ·  id ' + t.id;
     el.appendChild(meta);
 
-    var actions = document.createElement('div');
-    actions.className = 'rv-actions';
+    el.appendChild(actions(t.id, el));
+    return el;
+  }
+
+  // Approve / reject row. Shared by both card types so the two queues cannot
+  // drift apart in what they let you do.
+  function actions(id, el){
+    var row = document.createElement('div');
+    row.className = 'rv-actions';
 
     if(status !== 'approved'){
       var ok = document.createElement('button');
       ok.className = 'btn btn-signal';
       ok.type = 'button';
       ok.textContent = 'Approve';
-      ok.addEventListener('click', function(){ moderate(t.id, 'approved', el, ok); });
-      actions.appendChild(ok);
+      ok.addEventListener('click', function(){ moderate(id, 'approved', el, ok); });
+      row.appendChild(ok);
     }
 
     if(status !== 'rejected'){
@@ -148,11 +167,58 @@ noindex: true
       no.className = 'btn btn-ghost';
       no.type = 'button';
       no.textContent = status === 'approved' ? 'Take down' : 'Reject';
-      no.addEventListener('click', function(){ moderate(t.id, 'rejected', el, no); });
-      actions.appendChild(no);
+      no.addEventListener('click', function(){ moderate(id, 'rejected', el, no); });
+      row.appendChild(no);
+    }
+    return row;
+  }
+
+  // A place submission is a city, a name, and maybe coordinates — no link and no
+  // title, so it gets its own card rather than being forced into the trip one.
+  function placeCard(p){
+    var el = document.createElement('article');
+    el.className = 'trip-card rv-card';
+
+    var c = document.createElement('span');
+    c.className = 'label';
+    c.textContent = p.city + (p.category ? ' · ' + p.category : '');
+    el.appendChild(c);
+
+    var h = document.createElement('h3');
+    h.textContent = p.name;
+    el.appendChild(h);
+
+    if(p.note){
+      var n = document.createElement('p');
+      n.textContent = p.note;
+      el.appendChild(n);
     }
 
-    el.appendChild(actions);
+    var meta = document.createElement('p');
+    meta.className = 'rv-link mono';
+    if(p.lat != null && p.lng != null){
+      // Their coordinates, checkable in one click before you trust them.
+      var a = document.createElement('a');
+      a.href = 'https://www.google.com/maps/search/?api=1&query=' + p.lat + ',' + p.lng;
+      a.target = '_blank'; a.rel = 'nofollow noopener noreferrer';
+      a.textContent = Number(p.lat).toFixed(5) + ', ' + Number(p.lng).toFixed(5);
+      meta.appendChild(a);
+    } else {
+      // No coordinates given, so offer the search that would find them.
+      var s2 = document.createElement('a');
+      s2.href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(p.name + ' ' + p.city);
+      s2.target = '_blank'; s2.rel = 'nofollow noopener noreferrer';
+      s2.textContent = 'no coordinates — look it up';
+      meta.appendChild(s2);
+    }
+    el.appendChild(meta);
+
+    var sub = document.createElement('p');
+    sub.className = 'rv-meta';
+    sub.textContent = 'Submitted ' + when(p.created_at) + '  ·  id ' + p.id;
+    el.appendChild(sub);
+
+    el.appendChild(actions(p.id, el));
     return el;
   }
 
@@ -170,7 +236,7 @@ noindex: true
     busy = true;
     say('Loading…');
 
-    fetch(API + '/api/trips/queue?status=' + encodeURIComponent(status), {
+    fetch(API + ENDPOINT[kind].queue + '?status=' + encodeURIComponent(status), {
       headers: { 'X-Admin-Token': token },
     })
     .then(function(r){
@@ -183,20 +249,23 @@ noindex: true
       return r.json();
     })
     .then(function(d){
-      var trips = (d && d.trips) || [];
+      var items = (d && d[ENDPOINT[kind].list]) || [];
+      var noun = kind === 'trips' ? 'trip' : 'place';
       sessionStorage.setItem(KEY, token);
       showBoard();
       list.replaceChildren();
-      countEl.textContent = trips.length === 1 ? '1 trip' : trips.length + ' trips';
+      countEl.textContent = items.length === 1 ? ('1 ' + noun) : items.length + ' ' + noun + 's';
 
-      if(!trips.length){
+      if(!items.length){
         list.appendChild(empty(
           status === 'pending'
-            ? 'Nothing waiting. Submitted trips land here for review.'
-            : 'No ' + status + ' trips.'
+            ? (kind === 'trips'
+                ? 'Nothing waiting. Trips submitted from the site land here.'
+                : 'Nothing waiting. Places submitted from /add-place/ land here.')
+            : 'No ' + status + ' ' + noun + 's.'
         ));
       } else {
-        trips.forEach(function(t){ list.appendChild(card(t)); });
+        items.forEach(function(t){ list.appendChild(kind === 'trips' ? card(t) : placeCard(t)); });
       }
       say('');
     })
@@ -216,7 +285,7 @@ noindex: true
     Array.prototype.forEach.call(buttons, function(b){ b.disabled = true; });
     btn.textContent = next === 'approved' ? 'Approving…' : 'Rejecting…';
 
-    fetch(API + '/api/trips/' + encodeURIComponent(id) + '/moderate', {
+    fetch(API + ENDPOINT[kind].moderate(id), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
       body: JSON.stringify({ status: next }),
@@ -228,7 +297,11 @@ noindex: true
     })
     .then(function(){
       el.classList.add('is-gone');
-      say(next === 'approved' ? 'Approved — it is live on /trips/ now.' : 'Rejected.', 'good');
+      say(next === 'approved'
+        ? (kind === 'trips'
+            ? 'Approved — it is live on /trips/ now.'
+            : 'Approved — run tools/promote_submissions.js to pull its real location and add it.')
+        : 'Rejected.', 'good');
       setTimeout(function(){
         el.remove();
         var left = list.querySelectorAll('.rv-card').length;
@@ -248,6 +321,15 @@ noindex: true
       tabs.forEach(function(t){ t.classList.remove('is-on'); });
       tab.classList.add('is-on');
       status = tab.dataset.status;
+      load();
+    });
+  });
+
+  kindTabs.forEach(function(tab){
+    tab.addEventListener('click', function(){
+      kindTabs.forEach(function(t){ t.classList.remove('is-on'); });
+      tab.classList.add('is-on');
+      kind = tab.getAttribute('data-kind');
       load();
     });
   });
