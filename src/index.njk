@@ -168,10 +168,12 @@ layout: base.njk
     if(frame.contentWindow) frame.contentWindow.postMessage({type:type}, APP_ORIGIN);
   }
 
-  // Just the city. The database qualifies names so they can be told apart when
-  // you are choosing one — "Rome, Italy", "Aberdeen (SD, USA)" — but this line
-  // is not a chooser, and on a phone the qualifier is what gets cut off, so the
-  // sentence ends mid-word. Anyone reading "Browsing Rome" knows where Rome is.
+  // Just the city, for the status line above the preview. The database qualifies
+  // names so they can be told apart when you are choosing one — "Rome, Italy",
+  // "Aberdeen (SD, USA)" — but that line is not a chooser, and on a phone the
+  // qualifier is what gets cut off, so it ends mid-word. Nothing else on the
+  // page uses this: the sentence underneath has room for the full name, and the
+  // app and the city picker need it.
   //
   // Both shapes appear in the data: a comma for most, parentheses for the 1,461
   // US entries that need a state. Cut at whichever comes first.
@@ -214,8 +216,10 @@ layout: base.njk
     } else {
       locate.dataset.mode = 'browse';
       locate.textContent = 'Use my location ▸';
-      var city = shortCity(d.cityName) || 'Rome';
-      setMode('BROWSING MODE — location set as ' + city + '.');
+      var city = d.cityName || 'Rome, Italy';
+      // Short on the status line only, which is the one that gets cut off. The
+      // sentence below it has room, so it keeps the full name.
+      setMode('BROWSING MODE — location set as ' + shortCity(city) + '.');
       fine.textContent = 'Browsing ' + city + ' — no location needed. Pick any city inside, or switch to where you actually are.';
     }
   });
