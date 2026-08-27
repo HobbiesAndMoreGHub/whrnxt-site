@@ -38,13 +38,21 @@ header.nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(10px);
 .btn-ghost:hover{border-color:var(--muted)}
 .nav .btn{padding:9px 16px}
 /* Below 820px the links used to be display:none outright, so a phone had no way
-   to reach anything but the footer's Articles link. They wrap onto their own row
-   instead, scrolling sideways if they still do not fit. */
+   to reach anything but the footer's Articles link. They move onto their own row
+   instead, and wrap within it when the four of them are wider than the screen —
+   which they are on most phones. Wrapping rather than side-scrolling is what
+   lets them stay centred: a centred row that overflows pushes its first item off
+   the left edge, where nothing can scroll back to it. */
 @media(max-width:820px){
-  .nav-in{flex-wrap:wrap;height:auto;padding:10px 0;gap:12px}
-  .nav-links{order:3;width:100%;margin-left:0;gap:18px;font-size:14px;
-    overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;white-space:nowrap}
-  .nav-links a{flex:0 0 auto}
+  /* .nav-in and .wrap are the SAME element, and this rule comes later at equal
+     specificity — so `padding:10px 0` was quietly cancelling the page's 24px of
+     side padding. That is why the logo sat against the left edge of the screen
+     and Open app against the right. Only the vertical padding should change
+     here; the horizontal padding is the page's margin and has to survive. */
+  .nav-in{flex-wrap:wrap;height:auto;padding:10px 24px;gap:12px}
+  .nav-links{order:3;width:100%;margin-left:0;gap:10px 20px;font-size:14px;
+    flex-wrap:wrap;justify-content:center;padding-bottom:2px}
+  .nav-links a{flex:0 0 auto;white-space:nowrap}
   .nav .btn{margin-left:auto}
 }
 
