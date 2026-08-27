@@ -101,6 +101,8 @@ eleventyExcludeFromCollections: true
   .find-suggest-item:hover,.find-suggest-item.active{background:#1b2635}
   .statgo{display:block;width:100%;text-align:left;font:inherit;cursor:pointer}
   .statgo:hover{border-color:#3a4658}
+  .desc{margin:6px 0 0;color:var(--ink);font-size:13.5px;line-height:1.5;max-width:70ch}
+  .alt{color:var(--muted);font-weight:400;font-size:.82em}
   .rm-box{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2)}
   .rm-line{display:flex;gap:8px;flex-wrap:wrap}
   .rm-line select,.rm-line input{flex:1 1 210px;min-width:0;background:#0d1117;border:1px solid var(--line);
@@ -472,8 +474,13 @@ window.addEventListener('unhandledrejection', function (e) {
     b.innerHTML = head + unpinned.list.map(function(p){
       var has = (p.lat != null && p.lng != null);
       return '<div class="row" data-pid="' + esc(p.id) + '">' +
-        '<span class="label">' + esc(p.city || '') + (p.category ? ' \u00b7 ' + esc(p.category) : '') + '</span>' +
-        '<h3>' + esc(p.name) + '</h3>' +
+        '<span class="label">' + esc(p.city || '') + (p.category ? ' \u00b7 ' + esc(p.category) : '') +
+          (p.major ? ' \u00b7 major' : '') + '</span>' +
+        '<h3>' + esc(p.name) + (p.local_name ? ' <span class="alt">' + esc(p.local_name) + '</span>' : '') + '</h3>' +
+        // What the place is, before where it is. A name on its own is often not
+        // enough to search for; this is the line that says what to look for.
+        (p.description ? '<p class="desc">' + esc(p.description) + '</p>' : '') +
+        refs(p) +
         (p.address ? '<p class="meta">' + esc(p.address) + '</p>' : '') +
         '<p class="meta">' + (has
             ? '<a href="https://www.google.com/maps/search/?api=1&query=' + Number(p.lat) + ',' + Number(p.lng) + '" target="_blank" rel="nofollow noopener noreferrer">' +
@@ -491,6 +498,17 @@ window.addEventListener('unhandledrejection', function (e) {
         '</div>';
     }).join('') + pager();
   }
+  // Anything else already known that helps identify it. Few rows have these,
+  // but where there is a website or a Wikipedia article it settles the match
+  // outright, so it is worth the line.
+  function refs(p){
+    var out = [];
+    var site = safeHref(p.website), wiki = safeHref(p.wiki);
+    if (site) out.push('<a href="' + esc(site) + '" target="_blank" rel="nofollow noopener noreferrer">website \u2197</a>');
+    if (wiki) out.push('<a href="' + esc(wiki) + '" target="_blank" rel="nofollow noopener noreferrer">wikipedia \u2197</a>');
+    return out.length ? '<p class="meta">' + out.join(' \u00b7 ') + '</p>' : '';
+  }
+
   // Removing asks why before it does anything. The reason is the point: a year
   // from now a place that closed and a place that never existed are different
   // problems, and a bare delete records neither. It is folded into the row
@@ -566,6 +584,7 @@ window.addEventListener('unhandledrejection', function (e) {
         return '<div class="row" data-rid="' + esc(r.id) + '">' +
           '<span class="label">' + esc(r.city || 'no city') + (r.category ? ' \u00b7 ' + esc(r.category) : '') + '</span>' +
           '<h3>' + esc(r.name || r.id) + '</h3>' +
+          (r.description ? '<p class="desc">' + esc(r.description) + '</p>' : '') +
           '<p class="meta">' + esc(r.reason || 'no reason given') +
             ' \u00b7 ' + esc(String(r.removed_at || '').slice(0, 10)) +
             (r.removed_by ? ' \u00b7 ' + esc(r.removed_by) : '') + '</p>' +
@@ -615,7 +634,11 @@ window.addEventListener('unhandledrejection', function (e) {
       lang: 'en',
 
       title: p.name,
-      subtitle: (p.city || '') + ' \u2014 search for it, or drop a pin on the map. Dragging keeps the coordinate but drops the Google match.',
+      // The description goes in front of you while you search, because the
+      // search box is where you need to know what you are looking for.
+      subtitle: (p.city || '') +
+        (p.description ? ' \u2014 ' + p.description : '') +
+        ' \u2014 search for it, or drop a pin on the map. Dragging keeps the coordinate but drops the Google match.',
       lat: p.lat, lng: p.lng,
       name: p.name,
       query: [p.name, p.city].filter(Boolean).join(', '),
