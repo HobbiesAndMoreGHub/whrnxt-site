@@ -104,9 +104,6 @@ eleventyExcludeFromCollections: true
   .desc{margin:6px 0 0;color:var(--ink);font-size:13.5px;line-height:1.5;max-width:70ch}
   .alt{color:var(--muted);font-weight:400;font-size:.82em}
   .rm-box{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2)}
-  .rm-line{display:flex;gap:8px;flex-wrap:wrap}
-  .rm-line select,.rm-line input{flex:1 1 210px;min-width:0;background:#0d1117;border:1px solid var(--line);
-    color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px}
   .rm-go{background:var(--bad);color:#160b0d;border-color:var(--bad);font-weight:700}
   .pin-filter{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
   .pin-filter input{flex:1;min-width:160px;background:var(--panel-2);border:1px solid var(--line);
@@ -395,6 +392,16 @@ window.addEventListener('unhandledrejection', function (e) {
   // apostrophe. CSS.escape would do it and is not defined everywhere; escaping
   // the two characters that can close a quoted attribute value is enough, and it
   // depends on nothing.
+  // Google Maps in English. The embedded picker map sets language=en when its
+  // script loads, but a link that opens maps.google.com in a new tab is a fresh
+  // page and picks its own language from the place — which is why Aalborg came
+  // back in Danish. hl=en is the same admin-only choice, applied to the other
+  // half of it.
+  function gmaps(query, placeId){
+    return 'https://www.google.com/maps/search/?api=1&hl=en&query=' + encodeURIComponent(query) +
+      (placeId ? '&query_place_id=' + encodeURIComponent(placeId) : '');
+  }
+
   function attr(name, val){
     return '[' + name + '="' + String(val).replace(/(["\\])/g, '\\$1') + '"]';
   }
@@ -483,13 +490,13 @@ window.addEventListener('unhandledrejection', function (e) {
         refs(p) +
         (p.address ? '<p class="meta">' + esc(p.address) + '</p>' : '') +
         '<p class="meta">' + (has
-            ? '<a href="https://www.google.com/maps/search/?api=1&query=' + Number(p.lat) + ',' + Number(p.lng) + '" target="_blank" rel="nofollow noopener noreferrer">' +
+            ? '<a href="' + gmaps(Number(p.lat) + ',' + Number(p.lng)) + '" target="_blank" rel="nofollow noopener noreferrer">' +
               Number(p.lat).toFixed(5) + ', ' + Number(p.lng).toFixed(5) + '</a> \u00b7 unverified'
             : 'no coordinates at all') +
           ' \u00b7 ' + esc(p.coord_source || 'unknown') + '</p>' +
         '<div class="acts">' +
           '<button class="btn btn-signal rec-btn" data-pin="' + esc(p.id) + '">Set location</button>' +
-          '<a class="btn rec-btn" href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent((p.name||'') + ' ' + (p.city||'')) + '" target="_blank" rel="nofollow noopener noreferrer">Google Maps \u2197</a>' +
+          '<a class="btn rec-btn" href="' + gmaps((p.name||'') + ' ' + (p.city||'')) + '" target="_blank" rel="nofollow noopener noreferrer">Google Maps \u2197</a>' +
           '<a class="btn rec-btn" href="https://www.google.com/search?q=' + encodeURIComponent((p.name||'') + ' ' + (p.city||'')) + '" target="_blank" rel="nofollow noopener noreferrer">Web \u2197</a>' +
           '<button class="btn btn-ghost rec-btn" data-rm="' + esc(p.id) + '">Remove</button>' +
         '</div>' +
@@ -509,33 +516,22 @@ window.addEventListener('unhandledrejection', function (e) {
     return out.length ? '<p class="meta">' + out.join(' \u00b7 ') + '</p>' : '';
   }
 
-  // Removing asks why before it does anything. The reason is the point: a year
-  // from now a place that closed and a place that never existed are different
-  // problems, and a bare delete records neither. It is folded into the row
-  // rather than thrown up as a dialog so the place you are judging stays on
-  // screen while you judge it.
-  var REASONS = [
-    ['closed',        'Closed \u2014 it is not there any more'],
-    ['moved',         'Moved \u2014 the entry is wrong, not the place'],
-    ['duplicate',     'Duplicate of another entry'],
-    ['never_existed', 'Never existed / not a real place'],
-    ['other',         'Something else']
-  ];
+  // Removing asks once, and that is all. It does not ask why: making someone
+  // categorise every removal is friction on the common case, which is simply
+  // that the place is not there. Nothing is lost by not knowing — the whole row
+  // is kept and Put back restores it either way.
+  //
+  // The confirmation is folded into the row rather than raised as a browser
+  // dialog, so the place being judged stays on screen while it is judged.
   function removeBox(p){
     var id = esc(p.id);
     return '<div class="rm-box" data-rmbox="' + id + '" hidden>' +
-      '<p class="fine" style="margin:0 0 8px">Why is <strong style="color:var(--ink)">' + esc(p.name) + '</strong> going?</p>' +
-      '<div class="rm-line">' +
-        '<select data-rmreason="' + id + '">' +
-          REASONS.map(function(r){ return '<option value="' + r[0] + '">' + esc(r[1]) + '</option>'; }).join('') +
-        '</select>' +
-        '<input data-rmnote="' + id + '" placeholder="Note (optional)" maxlength="300" autocomplete="off">' +
-      '</div>' +
-      '<div class="acts" style="margin-top:10px">' +
-        '<button class="btn rm-go" data-rmgo="' + id + '">Remove it</button>' +
+      '<p style="margin:0 0 10px">Remove <strong style="color:var(--ink)">' + esc(p.name) + '</strong>?</p>' +
+      '<div class="acts">' +
+        '<button class="btn rm-go" data-rmgo="' + id + '">Yes, remove it</button>' +
         '<button class="btn btn-ghost" data-rmcancel="' + id + '">Cancel</button>' +
       '</div>' +
-      '<p class="fine" style="margin:8px 0 0">It goes to <strong style="color:var(--ink)">Removed places</strong>, where you can put it back.</p>' +
+      '<p class="fine" style="margin:10px 0 0">It goes to <strong style="color:var(--ink)">Removed places</strong>, where you can put it back.</p>' +
     '</div>';
   }
 
@@ -543,26 +539,22 @@ window.addEventListener('unhandledrejection', function (e) {
     var box = document.querySelector(attr('data-rmbox', id));
     if (!box) return;
     box.hidden = (on === false) ? true : !box.hidden;
-    if (!box.hidden) { var sel = box.querySelector('select'); if (sel) sel.focus(); }
+    if (!box.hidden) { var go = box.querySelector('[data-rmgo]'); if (go) go.focus(); }
   }
 
   function removePlace(id, btn){
     var row = btn.closest('.row');
-    var sel = document.querySelector(attr('data-rmreason', id));
-    var note = document.querySelector(attr('data-rmnote', id));
     var out = row && row.querySelector('[data-pinout]');
     btn.disabled = true; btn.textContent = 'Removing...';
-    api('/api/admin/places/' + encodeURIComponent(id) + '/remove', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ reason: sel ? sel.value : 'other', note: note ? note.value.trim() : '' })
-    }).then(function(d){
+    api('/api/admin/places/' + encodeURIComponent(id) + '/remove', { method:'POST' })
+      .then(function(d){
       if (row) { row.classList.add('gone'); setTimeout(function(){ row.remove(); }, 300); }
       unpinned.list = unpinned.list.filter(function(x){ return String(x.id) !== String(id); });
       unpinned.total = Math.max(0, unpinned.total - 1);
       say('Removed \u2014 kept under Removed places. Run tools/sync_pg_to_data.js to take it out of the app too.', 'good');
       api('/api/admin/summary').then(function(sm){ summary = sm; updatePills(); }).catch(function(){});
     }).catch(function(e){
-      btn.disabled = false; btn.textContent = 'Remove it';
+      btn.disabled = false; btn.textContent = 'Yes, remove it';
       if (out) { out.style.color = 'var(--bad)'; out.textContent = e.message; }
     });
   }
@@ -585,9 +577,11 @@ window.addEventListener('unhandledrejection', function (e) {
           '<span class="label">' + esc(r.city || 'no city') + (r.category ? ' \u00b7 ' + esc(r.category) : '') + '</span>' +
           '<h3>' + esc(r.name || r.id) + '</h3>' +
           (r.description ? '<p class="desc">' + esc(r.description) + '</p>' : '') +
-          '<p class="meta">' + esc(r.reason || 'no reason given') +
-            ' \u00b7 ' + esc(String(r.removed_at || '').slice(0, 10)) +
-            (r.removed_by ? ' \u00b7 ' + esc(r.removed_by) : '') + '</p>' +
+          '<p class="meta">' + [
+              esc(String(r.removed_at || '').slice(0, 10)),
+              r.removed_by ? esc(r.removed_by) : '',
+              r.reason ? esc(r.reason) : ''
+            ].filter(Boolean).join(' \u00b7 ') + '</p>' +
           '<div class="acts"><button class="btn" data-restore="' + esc(r.id) + '">Put back</button></div>' +
           '<p class="meta" data-rout="' + esc(r.id) + '"></p>' +
           '</div>';
@@ -731,8 +725,8 @@ window.addEventListener('unhandledrejection', function (e) {
   }
   function placeRow(p){
     var maps = (p.lat != null && p.lng != null)
-      ? '<a href="https://www.google.com/maps/search/?api=1&query=' + p.lat + ',' + p.lng + '" target="_blank" rel="nofollow noopener noreferrer">' + Number(p.lat).toFixed(5) + ', ' + Number(p.lng).toFixed(5) + '</a>'
-      : '<a href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent((p.name||'') + ' ' + (p.city||'')) + '" target="_blank" rel="nofollow noopener noreferrer">no coordinates — look it up</a>';
+      ? '<a href="' + gmaps(p.lat + ',' + p.lng) + '" target="_blank" rel="nofollow noopener noreferrer">' + Number(p.lat).toFixed(5) + ', ' + Number(p.lng).toFixed(5) + '</a>'
+      : '<a href="' + gmaps((p.name||'') + ' ' + (p.city||'')) + '" target="_blank" rel="nofollow noopener noreferrer">no coordinates — look it up</a>';
     return '<div class="row" data-id="' + esc(p.id) + '">' +
       '<span class="label">' + esc(p.city) + (p.category ? ' · ' + esc(p.category) : '') + '</span>' +
       '<h3>' + esc(p.name) + '</h3>' +

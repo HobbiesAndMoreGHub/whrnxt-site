@@ -171,7 +171,10 @@
     // means looking at a map, and with a place id it opens that place's own card.
     var out = el.querySelector('#pin-open');
     if (out) {
+      // hl comes from the caller for the same reason the Places language does:
+      // the admin reads English, and a translated app will want the local one.
       out.href = 'https://www.google.com/maps/search/?api=1&query=' + lat + ',' + lng +
+        (cfg.lang ? '&hl=' + encodeURIComponent(cfg.lang) : '') +
         (placeId ? '&query_place_id=' + encodeURIComponent(placeId) : '');
     }
     if (!map) return;
