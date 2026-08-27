@@ -493,6 +493,8 @@ window.addEventListener('unhandledrejection', function (e) {
     window.whrnxtPinPicker.open({
       api: API,
       mapsKey: MAPS_KEY,
+      lang: 'en',
+
       title: p.name,
       subtitle: (p.city || '') + ' \u2014 search for it, or drop a pin on the map. Dragging keeps the coordinate but drops the Google match.',
       lat: p.lat, lng: p.lng,

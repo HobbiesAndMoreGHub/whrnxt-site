@@ -245,7 +245,10 @@
     var q = el.querySelector('#pin-q').value.trim();
     var box = el.querySelector('#pin-suggest');
     if (q.length < 3) { box.style.display = 'none'; return; }
-    fetch(cfg.api + '/api/placesearch?q=' + encodeURIComponent(q))
+    // English on purpose, and only here. The app leaves this off so Google
+    // answers in the language of the place, which is what a translated app will
+    // want; the admin is reading against an English database.
+    fetch(cfg.api + '/api/placesearch?q=' + encodeURIComponent(q) + (cfg.lang ? '&lang=' + encodeURIComponent(cfg.lang) : ''))
       .then(function (r) { return r.ok ? r.json() : { suggestions: [] }; })
       .then(function (d) {
         suggestions = d.suggestions || [];
@@ -266,7 +269,7 @@
   function choose(s) {
     if (!s) return;
     el.querySelector('#pin-suggest').style.display = 'none';
-    fetch(cfg.api + '/api/place?id=' + encodeURIComponent(s.placeId))
+    fetch(cfg.api + '/api/place?id=' + encodeURIComponent(s.placeId) + (cfg.lang ? '&lang=' + encodeURIComponent(cfg.lang) : ''))
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
         if (!d || typeof d.lat !== 'number') return;
