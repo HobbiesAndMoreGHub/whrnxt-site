@@ -68,8 +68,12 @@
       window[cb] = function () { resolve(window.google.maps); };
       var sc = document.createElement('script');
       sc.async = true;
+      // language=en, or Google labels the map in the local language — Aalborg came
+      // back in Danish. The database is written in English, so matching a place
+      // on screen against the row being fixed means reading the same name twice.
+      // It can only be set when the script loads; there is no changing it after.
       sc.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key) +
-               '&libraries=marker&loading=async&callback=' + cb;
+               '&language=en&libraries=marker&loading=async&callback=' + cb;
       sc.onerror = function () { reject(new Error('Google Maps failed to load')); };
       document.head.appendChild(sc);
     });
