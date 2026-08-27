@@ -109,6 +109,13 @@ eleventyExcludeFromCollections: true
   .pin-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;
     width:100%;max-width:580px;max-height:92vh;overflow-y:auto}
   .pin-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px}
+  .pin-src{display:flex;gap:6px;align-items:center;margin-top:10px}
+  .pin-tab{background:none;border:1px solid var(--line);color:var(--muted);border-radius:999px;
+    padding:5px 12px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+  .pin-tab.on{background:#1b2635;color:var(--ink);border-color:#3a4658}
+  .pin-tab:disabled{opacity:.45;cursor:not-allowed}
+  .pin-out{margin-left:auto;font-size:12.5px;color:var(--muted);text-decoration:none}
+  .pin-out:hover{color:var(--ink)}
   .pin-search{display:flex;gap:8px;margin-top:10px}
   .pin-search input{flex:1;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
     color:var(--ink);padding:9px 11px;font:inherit;font-size:14px}
@@ -459,7 +466,8 @@ window.addEventListener('unhandledrejection', function (e) {
           ' \u00b7 ' + esc(p.coord_source || 'unknown') + '</p>' +
         '<div class="acts">' +
           '<button class="btn btn-signal rec-btn" data-pin="' + esc(p.id) + '">Set location</button>' +
-          '<a class="btn rec-btn" href="https://www.google.com/search?q=' + encodeURIComponent((p.name||'') + ' ' + (p.city||'')) + '" target="_blank" rel="nofollow noopener noreferrer">\ud83d\udd0d Google</a>' +
+          '<a class="btn rec-btn" href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent((p.name||'') + ' ' + (p.city||'')) + '" target="_blank" rel="nofollow noopener noreferrer">Google Maps \u2197</a>' +
+          '<a class="btn rec-btn" href="https://www.google.com/search?q=' + encodeURIComponent((p.name||'') + ' ' + (p.city||'')) + '" target="_blank" rel="nofollow noopener noreferrer">Web \u2197</a>' +
         '</div>' +
         '<p class="meta" data-pinout="' + esc(p.id) + '"></p>' +
         '</div>';

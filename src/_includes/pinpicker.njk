@@ -11,7 +11,20 @@
 // database in a state nobody could trust.
 (function () {
   var el = null, map = null, marker = null, picked = null, cfg = null,
-      suggestions = [], timer = null, gmapsPromise = null;
+      suggestions = [], timer = null, gmapsPromise = null, source = 'google';
+
+  function markTabs() {
+    if (!el) return;
+    Array.prototype.forEach.call(el.querySelectorAll('.pin-tab'), function (b) {
+      b.classList.toggle('on', b.getAttribute('data-src') === source);
+    });
+    var gt = el.querySelector('.pin-tab[data-src="google"]');
+    if (gt) {
+      var usable = !!(cfg && cfg.mapsKey) && !gmapsAuthFailed;
+      gt.disabled = !usable;
+      gt.title = usable ? '' : 'No usable Google Maps key — set ADMIN_GOOGLE_API_KEY, and enable Maps JavaScript API both on the project and on the key.';
+    }
+  }
 
   // Google tiles when a browser key is configured, OpenStreetMap otherwise.
   //
@@ -37,6 +50,8 @@
     if (!host) return;
     map = null; marker = null;
     host.innerHTML = '';
+    source = 'osm';
+    markTabs();
     drawLeaflet(host);
     var note = el.querySelector('#pin-at');
     if (note) {
@@ -76,6 +91,11 @@
           '<button class="btn" type="button" id="pin-find">Find</button>' +
         '</div>' +
         '<ul id="pin-suggest" class="find-suggest" style="display:none;position:static"></ul>' +
+        '<div class="pin-src">' +
+          '<button class="pin-tab" type="button" data-src="google">Google</button>' +
+          '<button class="pin-tab" type="button" data-src="osm">OpenStreetMap</button>' +
+          '<a class="pin-out" id="pin-open" href="#" target="_blank" rel="noopener">Open in Google Maps &#8599;</a>' +
+        '</div>' +
         '<div id="pin-map"></div>' +
         '<p class="fine" id="pin-at"></p>' +
         '<button class="btn btn-signal" type="button" id="pin-use" style="width:100%">Use this location</button>' +
@@ -88,6 +108,20 @@
       clearTimeout(timer); timer = setTimeout(search, 320);
     });
     el.querySelector('#pin-find').addEventListener('click', search);
+    // Switching source keeps the pin. Being able to put the same coordinate on
+    // both maps is how you tell "I am in the wrong place" from "this tile just
+    // does not show what I am looking for" — and it makes it obvious at a glance
+    // whether the Google key is working at all.
+    el.querySelector('.pin-src').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-src]');
+      if (!b) return;
+      source = b.getAttribute('data-src');
+      var host = el.querySelector('#pin-map');
+      if (map) { if (!map.__google && map.remove) map.remove(); map = null; marker = null; }
+      host.innerHTML = '';
+      markTabs();
+      drawMap();
+    });
     el.querySelector('#pin-suggest').addEventListener('click', function (e) {
       var li = e.target.closest('[data-i]');
       if (li) choose(suggestions[+li.getAttribute('data-i')]);
@@ -129,6 +163,13 @@
     el.querySelector('#pin-at').textContent =
       (label ? label + ' — ' : '') + lat.toFixed(6) + ', ' + lng.toFixed(6) +
       (placeId ? '  (matched to a Google place)' : '');
+    // Google Maps proper, at this pin — not a web search. Checking a coordinate
+    // means looking at a map, and with a place id it opens that place's own card.
+    var out = el.querySelector('#pin-open');
+    if (out) {
+      out.href = 'https://www.google.com/maps/search/?api=1&query=' + lat + ',' + lng +
+        (placeId ? '&query_place_id=' + encodeURIComponent(placeId) : '');
+    }
     if (!map) return;
     if (map.__google) {
       if (!marker) {
@@ -151,11 +192,12 @@
   function drawMap() {
     var host = el.querySelector('#pin-map');
     if (!host) return;
-    if (cfg && cfg.mapsKey && !gmapsAuthFailed) {
+    if (source === 'google' && cfg && cfg.mapsKey && !gmapsAuthFailed) {
       loadGoogleMaps(cfg.mapsKey).then(function () { if (!gmapsAuthFailed) drawGoogle(host); })
-        .catch(function () { drawLeaflet(host); });   // key rejected, still usable
+        .catch(function () { source = 'osm'; markTabs(); drawLeaflet(host); });
       return;
     }
+    if (source === 'google') { source = 'osm'; markTabs(); }   // no key: say so on the tabs
     drawLeaflet(host);
   }
 
@@ -243,6 +285,8 @@
       el.querySelector('#pin-sub').textContent = cfg.subtitle || '';
       el.querySelector('#pin-q').value = cfg.query || '';
       el.querySelector('#pin-at').textContent = '';
+      source = (cfg.mapsKey && !gmapsAuthFailed) ? 'google' : 'osm';
+      markTabs();
       el.hidden = false;
       setTimeout(drawMap, 30);
     },
