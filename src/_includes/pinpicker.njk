@@ -26,6 +26,25 @@
   // and to Maps JavaScript alone. The existing key cannot be reused: it is used
   // in eleven places server-side and by the local tools, none of which send a
   // referrer, so restricting it would break all of them.
+  // Google reports an auth problem — API not enabled, referrer rejected, key
+  // wrong — by calling this, long after the script has loaded successfully. The
+  // onerror path never fires, so without this the map is a grey box with an
+  // explanation only in the console.
+  var gmapsAuthFailed = false;
+  window.gm_authFailure = function () {
+    gmapsAuthFailed = true;
+    var host = el && el.querySelector('#pin-map');
+    if (!host) return;
+    map = null; marker = null;
+    host.innerHTML = '';
+    drawLeaflet(host);
+    var note = el.querySelector('#pin-at');
+    if (note) {
+      note.textContent = 'Google Maps refused that key — showing OpenStreetMap. '
+        + 'Check that Maps JavaScript API is enabled and the key allows this domain.';
+    }
+  };
+
   function loadGoogleMaps(key) {
     if (gmapsPromise) return gmapsPromise;
     gmapsPromise = new Promise(function (resolve, reject) {
@@ -132,8 +151,8 @@
   function drawMap() {
     var host = el.querySelector('#pin-map');
     if (!host) return;
-    if (cfg && cfg.mapsKey) {
-      loadGoogleMaps(cfg.mapsKey).then(function () { drawGoogle(host); })
+    if (cfg && cfg.mapsKey && !gmapsAuthFailed) {
+      loadGoogleMaps(cfg.mapsKey).then(function () { if (!gmapsAuthFailed) drawGoogle(host); })
         .catch(function () { drawLeaflet(host); });   // key rejected, still usable
       return;
     }
