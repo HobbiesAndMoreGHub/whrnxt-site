@@ -471,6 +471,9 @@ window.addEventListener('unhandledrejection', function (e) {
             '<div class="acts">' +
               '<button class="btn btn-signal rec-btn" data-enedit="' + esc(p.id) + '">Edit text</button>' +
               '<a class="btn rec-btn" href="' + gmaps((p.name||'') + ' ' + (p.city||'')) + '" target="_blank" rel="nofollow noopener noreferrer">Google Maps \u2197</a>' +
+              (shutterstock(p.city, p.name)
+                ? '<a class="btn rec-btn" href="' + esc(shutterstock(p.city, p.name)) + '" target="_blank" rel="nofollow noopener noreferrer">Shutterstock \u2197</a>'
+                : '') +
               (safeHref(p.website) ? '<a class="btn rec-btn" href="' + esc(safeHref(p.website)) + '" target="_blank" rel="nofollow noopener noreferrer">Website \u2197</a>' : '') +
               (safeHref(p.wiki) ? '<a class="btn rec-btn" href="' + esc(safeHref(p.wiki)) + '" target="_blank" rel="nofollow noopener noreferrer">Wikipedia \u2197</a>' : '') +
             '</div>' +
@@ -680,6 +683,32 @@ window.addEventListener('unhandledrejection', function (e) {
   // page and picks its own language from the place — which is why Aalborg came
   // back in Danish. hl=en is the same admin-only choice, applied to the other
   // half of it.
+  // Shutterstock puts the whole query in the path — /search/rome-vittoriano —
+  // so both halves have to survive being turned into one hyphenated slug.
+  //
+  // Accents are stripped rather than encoded: "Musée Cognacq-Jay" searches
+  // better as musee-cognacq-jay than as a path full of percent escapes. City
+  // slugs carry underscores in the database (aberdeen_uk), which become hyphens
+  // like everything else. Bracketed asides go — "Aalborg Castle (Aalborghus
+  // Slot)" is a better search without the second name in it, not worse.
+  function slugify(v){
+    return String(v || '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')   // é -> e
+      .replace(/\([^)]*\)/g, ' ')                         // drop asides
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  function shutterstock(city, name){
+    var c = slugify(city), n = slugify(name);
+    if (!n) return '';
+    // Not "aalborg-aalborg-castle": when the name already opens with the city,
+    // repeating it only makes the search worse.
+    var q = (c && n.indexOf(c + '-') !== 0 && n !== c) ? c + '-' + n : n;
+    return 'https://www.shutterstock.com/search/' + encodeURIComponent(q);
+  }
+
   function gmaps(query, placeId){
     return 'https://www.google.com/maps/search/?api=1&hl=en&query=' + encodeURIComponent(query) +
       (placeId ? '&query_place_id=' + encodeURIComponent(placeId) : '');
