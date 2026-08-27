@@ -392,6 +392,127 @@ window.addEventListener('unhandledrejection', function (e) {
   // apostrophe. CSS.escape would do it and is not defined everywhere; escaping
   // the two characters that can close a quoted attribute value is enough, and it
   // depends on nothing.
+  // ── publishing ────────────────────────────────────────────────────────────
+  //
+  // Pinning and removing write to Postgres. The app does not read Postgres: it
+  // serves database.js, built from data/*.js and committed to the app repo for
+  // Netlify to publish. A workflow does that every six hours so nothing is ever
+  // forgotten; this button is for when you would rather not wait.
+  //
+  // It dispatches the workflow with the admin's own GitHub token, which the
+  // OAuth app already grants repo scope. Nothing new is stored and no token
+  // reaches the API server — the browser talks to GitHub directly.
+  var APP_REPO   = 'HobbiesAndMoreGHub/TravelFriend';
+  var APP_BRANCH = 'master';
+  var PUBLISH_WF = 'publish-admin-edits.yml';
+  var GH_API     = 'https://api.github.com/repos/' + APP_REPO + '/actions/workflows/' + PUBLISH_WF;
+  var publishing = false;
+
+  function gh(url, opts){
+    opts = opts || {};
+    opts.headers = Object.assign({
+      'Authorization': 'Bearer ' + (sess && sess.gh),
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28'
+    }, opts.headers || {});
+    return fetch(url, opts);
+  }
+
+  function pubSay(text, kind){
+    var el = $('pub-out');
+    if (!el) return;
+    el.innerHTML = text;
+    el.style.color = kind === 'bad' ? 'var(--bad)' : (kind === 'good' ? 'var(--ok)' : '');
+  }
+
+  function publish(btn){
+    if (publishing) return;
+    // A publish needs GitHub, not the API's own admin token: the commit is made
+    // as you. Say so rather than failing with a 401 from a different service.
+    if (!sess || !sess.gh) {
+      pubSay('Publishing commits to the app repository as you, so it needs the GitHub sign-in rather than the admin token. Sign out and sign in with GitHub.', 'bad');
+      return;
+    }
+    publishing = true;
+    btn.disabled = true; btn.textContent = 'Starting...';
+    pubSay('Asking GitHub to run the publish workflow...');
+
+    // The newest run before we ask, so the one we are watching is ours and not
+    // the last scheduled run sitting there looking finished.
+    latestRunId().then(function(before){
+      return gh(GH_API + '/dispatches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ref: APP_BRANCH })
+      }).then(function(r){
+        if (r.status === 204) return watchRun(before, btn, 0);
+        return r.json().then(function(d){ throw new Error(ghWhy(r.status, d)); },
+                             function(){ throw new Error(ghWhy(r.status, null)); });
+      });
+    }).catch(function(e){
+      publishing = false;
+      btn.disabled = false; btn.textContent = 'Publish now';
+      pubSay(esc(e.message), 'bad');
+    });
+  }
+
+  // GitHub's own message is usually "Not Found" whatever went wrong, which is
+  // no help at all when three different things produce it.
+  function ghWhy(status, d){
+    if (status === 401) return 'GitHub rejected the token. Sign out and sign in again.';
+    if (status === 403) return 'Your GitHub account cannot run workflows on ' + APP_REPO + '. It needs write access.';
+    if (status === 404) return 'GitHub could not find the workflow. Either your account has no access to ' + APP_REPO + ', or ' + PUBLISH_WF + ' is not on ' + APP_BRANCH + ' yet.';
+    return (d && d.message) ? ('GitHub said: ' + d.message) : ('GitHub returned ' + status + '.');
+  }
+
+  function latestRunId(){
+    return gh(GH_API + '/runs?per_page=1').then(function(r){
+      if (!r.ok) return 0;
+      return r.json().then(function(d){
+        return (d.workflow_runs && d.workflow_runs[0] && d.workflow_runs[0].id) || 0;
+      });
+    }).catch(function(){ return 0; });
+  }
+
+  // Polls until a run newer than `before` finishes. Queueing can take a few
+  // seconds, so an unchanged id early on means "not started yet", not "failed".
+  function watchRun(before, btn, tries){
+    if (tries > 100) {                      // ~8 minutes
+      publishing = false;
+      btn.disabled = false; btn.textContent = 'Publish now';
+      pubSay('Started, but it is taking longer than expected. <a href="https://github.com/' + APP_REPO + '/actions" target="_blank" rel="noopener">Watch it on GitHub</a>.');
+      return;
+    }
+    return new Promise(function(res){ setTimeout(res, tries === 0 ? 2000 : 5000); }).then(function(){
+      return gh(GH_API + '/runs?per_page=1');
+    }).then(function(r){
+      if (!r.ok) return watchRun(before, btn, tries + 1);
+      return r.json().then(function(d){
+        var run = d.workflow_runs && d.workflow_runs[0];
+        if (!run || run.id === before) {
+          btn.textContent = 'Queued...';
+          pubSay('Waiting for GitHub to pick it up...');
+          return watchRun(before, btn, tries + 1);
+        }
+        var link = '<a href="' + esc(run.html_url) + '" target="_blank" rel="noopener">the run</a>';
+        if (run.status !== 'completed') {
+          btn.textContent = 'Publishing...';
+          pubSay('Building the app database. This takes a couple of minutes \u2014 ' + link + '.');
+          return watchRun(before, btn, tries + 1);
+        }
+        publishing = false;
+        btn.disabled = false; btn.textContent = 'Publish now';
+        if (run.conclusion === 'success') {
+          pubSay('Published. Netlify is deploying it now, which takes another minute or two. ' +
+                 'If there was nothing to publish it will have committed nothing \u2014 ' + link + ' says which.', 'good');
+          say('Published to the app.', 'good');
+        } else {
+          pubSay('The publish run did not succeed (' + esc(run.conclusion || 'no conclusion') + '). Nothing was committed. See ' + link + '.', 'bad');
+        }
+      });
+    });
+  }
+
   // Google Maps in English. The embedded picker map sets language=en when its
   // script loads, but a link that opens maps.google.com in a new tab is a fresh
   // page and picks its own language from the place — which is why Aalborg came
@@ -445,6 +566,13 @@ window.addEventListener('unhandledrejection', function (e) {
         stat((d.cities||0).toLocaleString(), 'cities') +
         stat((d.confirmed||0).toLocaleString(), 'location confirmed') +
         statLink((d.unpinned||0).toLocaleString(), 'still need a location', 'unpinned', (d.unpinned||0)>0) +
+      '</div>' +
+      '<div class="row"><h3>Publish to the app</h3>' +
+        '<p>Locations you pin and places you remove are saved straight away, but they live in the database until the app is rebuilt from it. ' +
+        'That happens on its own every six hours. This does it now.</p>' +
+        '<div class="acts"><button class="btn btn-signal" id="pub-go">Publish now</button>' +
+        '<a class="btn" href="https://github.com/' + APP_REPO + '/actions/workflows/' + PUBLISH_WF + '" target="_blank" rel="noopener">History \u2197</a></div>' +
+        '<p class="meta" id="pub-out"></p>' +
       '</div>' +
       (waiting
         ? '<div class="row"><h3>' + waiting + ' item' + (waiting===1?'':'s') + ' waiting for you</h3>' +
@@ -860,6 +988,8 @@ window.addEventListener('unhandledrejection', function (e) {
   document.addEventListener('click', function(e){
     var nav = e.target.closest('.navb[data-sec]');
     if (nav) { section = nav.getAttribute('data-sec'); status = 'pending'; renderQueue.data = null; load(); return; }
+    var pub = e.target.closest('#pub-go');
+    if (pub) { publish(pub); return; }
     var go = e.target.closest('[data-go]');
     if (go) { section = go.getAttribute('data-go'); status = 'pending'; renderQueue.data = null; load(); return; }
     var tab = e.target.closest('.tab[data-status]');
