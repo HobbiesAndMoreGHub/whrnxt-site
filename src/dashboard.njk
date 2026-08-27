@@ -188,7 +188,16 @@ window.addEventListener('unhandledrejection', function (e) {
 (function () {
   var API = {{ site.apiUrl | dump | safe }};
   var KEY = 'whrnxt-admin';          // our own session, independent of the CMS
+  // Fetched after sign-in rather than built into this page: the key then lives
+  // only on the API, is never committed, and reaches only an authenticated
+  // moderator. site.json stays as a fallback for a purely static setup.
   var MAPS_KEY = {{ site.googleMapsBrowserKey | dump | safe }};
+  function loadMapsKey(){
+    if (MAPS_KEY) return Promise.resolve(MAPS_KEY);
+    return api('/api/admin/mapskey')
+      .then(function (d) { MAPS_KEY = (d && d.key) || ''; return MAPS_KEY; })
+      .catch(function () { return ''; });   // no key just means OpenStreetMap
+  }
 
   var $ = function (id) { return document.getElementById(id); };
   window.__whrnxtBanner = function (text) {
@@ -468,6 +477,11 @@ window.addEventListener('unhandledrejection', function (e) {
   function openPin(id){
     var p = unpinned.list.filter(function(x){ return String(x.id) === String(id); })[0];
     if (!p || !window.whrnxtPinPicker) return;
+    // Resolves immediately once fetched; the first open may wait a moment
+    // rather than falling back to OpenStreetMap for want of one round trip.
+    loadMapsKey().then(function () { showPin(p); });
+  }
+  function showPin(p){
     window.whrnxtPinPicker.open({
       api: API,
       mapsKey: MAPS_KEY,
@@ -749,6 +763,7 @@ window.addEventListener('unhandledrejection', function (e) {
     sess = sess || loadSession();
     if (!sess) { show($('gate'), true); show($('shell'), false); return; }
     show($('gate'), false); show($('shell'), true);
+    loadMapsKey();
     $('whoami').textContent = sess.via === 'token' ? 'Signed in with admin token'
       : (sess.via === 'cms' ? 'Signed in via the article editor' : 'Signed in with GitHub');
     load();
