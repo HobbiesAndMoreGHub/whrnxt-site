@@ -99,6 +99,22 @@ eleventyExcludeFromCollections: true
   .find-suggest-item{padding:8px 11px;cursor:pointer;border-bottom:1px solid var(--line);font-size:14px}
   .find-suggest-item:last-child{border-bottom:none}
   .find-suggest-item:hover,.find-suggest-item.active{background:#1b2635}
+  .statgo{display:block;width:100%;text-align:left;font:inherit;cursor:pointer}
+  .statgo:hover{border-color:#3a4658}
+  .pin-filter{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+  .pin-filter input{flex:1;min-width:160px;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:8px;color:var(--ink);padding:8px 10px;font:inherit;font-size:14px}
+  .pin-back{position:fixed;inset:0;background:rgba(4,8,14,.74);z-index:900;display:flex;
+    align-items:center;justify-content:center;padding:16px}
+  .pin-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;
+    width:100%;max-width:580px;max-height:92vh;overflow-y:auto}
+  .pin-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px}
+  .pin-search{display:flex;gap:8px;margin-top:10px}
+  .pin-search input{flex:1;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
+    color:var(--ink);padding:9px 11px;font:inherit;font-size:14px}
+  #pin-map{height:300px;border-radius:10px;margin-top:10px;background:#0d131d}
+  #pin-at{margin:9px 0}
+  .find-suggest-sub{display:block;font-size:12px;color:var(--muted)}
   code{background:#0a0f17;border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12.5px}
   @media(max-width:760px){
     .shell{grid-template-columns:1fr}
@@ -137,6 +153,7 @@ eleventyExcludeFromCollections: true
     <button class="navb" data-sec="trips">Shared trips <span class="pill" id="pill-trips" hidden></span></button>
     <button class="navb" data-sec="places">Place submissions <span class="pill" id="pill-places" hidden></span></button>
     <a class="navb" href="/admin/cms/">Articles &#8599;</a>
+    <button class="navb" data-sec="unpinned">Unverified locations <span class="pill" id="pill-unpinned" hidden></span></button>
     <button class="navb" data-sec="users">Users</button>
     <div class="side-foot">
       <div id="whoami"></div>
@@ -156,7 +173,10 @@ eleventyExcludeFromCollections: true
   </main>
 </div>
 
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 {% include "citypicker.njk" %}
+{% include "pinpicker.njk" %}
 <script>
 // Anything that escapes is shown on the page. A dashboard that fails silently is
 // indistinguishable from one that is merely slow, and "nothing happened" is the
@@ -295,6 +315,7 @@ window.addEventListener('unhandledrejection', function (e) {
     overview: { title:'Overview',           sub:'What is waiting, and what is in the database.' },
     trips:    { title:'Shared trips',       sub:'Links people submitted. Approving one puts it on /trips/.' },
     places:   { title:'Place submissions',  sub:'From /add-place/. Approving marks it ready for tools/promote_submissions.js, which resolves the real location and writes it into the data files.' },
+    unpinned: { title:'Unverified locations', sub:'Places with no Google establishment id, so nothing has confirmed where they are. Pin one on the map and it becomes a location the app can trust.' },
     users:    { title:'Users',              sub:'Not built yet.' }
   };
 
@@ -358,8 +379,10 @@ window.addEventListener('unhandledrejection', function (e) {
       b.classList.toggle('on', b.getAttribute('data-sec') === section);
     });
     show($('tabs'), section === 'trips' || section === 'places');
+    if (section === 'unpinned') show($('tabs'), false);
     if (section === 'overview') return renderOverview();
     if (section === 'users')    return renderUsers();
+    if (section === 'unpinned') return renderUnpinned();
     return renderQueue();
   }
 
@@ -379,7 +402,7 @@ window.addEventListener('unhandledrejection', function (e) {
         stat((d.total||0).toLocaleString(), 'places in the database') +
         stat((d.cities||0).toLocaleString(), 'cities') +
         stat((d.confirmed||0).toLocaleString(), 'location confirmed') +
-        stat((d.unpinned||0).toLocaleString(), 'without a Google id', (d.unpinned||0)>0) +
+        statLink((d.unpinned||0).toLocaleString(), 'without a Google id', 'unpinned', (d.unpinned||0)>0) +
       '</div>' +
       (waiting
         ? '<div class="row"><h3>' + waiting + ' item' + (waiting===1?'':'s') + ' waiting for you</h3>' +
@@ -392,6 +415,85 @@ window.addEventListener('unhandledrejection', function (e) {
   }
   function stat(v, label, attn){
     return '<div class="stat' + (attn?' attn':'') + '"><b>' + esc(String(v)) + '</b><span>' + esc(label) + '</span></div>';
+  }
+  // A count of things that need doing should be the way to go and do them.
+  function statLink(v, label, sec, attn){
+    return '<button class="stat statgo' + (attn?' attn':'') + '" data-go="' + sec + '">' +
+      '<b>' + esc(String(v)) + '</b><span>' + esc(label) + ' \u2192</span></button>';
+  }
+
+  var unpinned = { list: [], total: 0, offset: 0, limit: 50, q: '' };
+
+  function renderUnpinned(){
+    var b = $('body');
+    if (busy) { b.innerHTML = '<div class="empty">Loading…</div>'; return; }
+    var head =
+      '<div class="pin-filter">' +
+        '<input id="unp-q" placeholder="Filter by name" value="' + esc(unpinned.q) + '" autocomplete="off">' +
+        '<button class="btn" type="button" id="unp-go">Filter</button>' +
+        '<span class="fine" id="unp-count">' +
+          (unpinned.total ? (unpinned.offset + 1) + '\u2013' + Math.min(unpinned.offset + unpinned.limit, unpinned.total) + ' of ' + unpinned.total.toLocaleString() : '0') +
+        '</span>' +
+      '</div>';
+    if (!unpinned.list.length) { b.innerHTML = head + '<div class="empty">Nothing here. Every place has a verified location.</div>'; return; }
+    b.innerHTML = head + unpinned.list.map(function(p){
+      var has = (p.lat != null && p.lng != null);
+      return '<div class="row" data-pid="' + esc(p.id) + '">' +
+        '<span class="label">' + esc(p.city || '') + (p.category ? ' \u00b7 ' + esc(p.category) : '') + '</span>' +
+        '<h3>' + esc(p.name) + '</h3>' +
+        (p.address ? '<p class="meta">' + esc(p.address) + '</p>' : '') +
+        '<p class="meta">' + (has
+            ? '<a href="https://www.google.com/maps/search/?api=1&query=' + Number(p.lat) + ',' + Number(p.lng) + '" target="_blank" rel="nofollow noopener noreferrer">' +
+              Number(p.lat).toFixed(5) + ', ' + Number(p.lng).toFixed(5) + '</a> \u00b7 unverified'
+            : 'no coordinates at all') +
+          ' \u00b7 ' + esc(p.coord_source || 'unknown') + '</p>' +
+        '<div class="acts">' +
+          '<button class="btn btn-signal rec-btn" data-pin="' + esc(p.id) + '">Set location</button>' +
+          '<a class="btn rec-btn" href="https://www.google.com/search?q=' + encodeURIComponent((p.name||'') + ' ' + (p.city||'')) + '" target="_blank" rel="nofollow noopener noreferrer">\ud83d\udd0d Google</a>' +
+        '</div>' +
+        '<p class="meta" data-pinout="' + esc(p.id) + '"></p>' +
+        '</div>';
+    }).join('') + pager();
+  }
+  function pager(){
+    var more = unpinned.offset + unpinned.limit < unpinned.total;
+    var back = unpinned.offset > 0;
+    if (!more && !back) return '';
+    return '<div class="acts" style="margin-top:14px">' +
+      (back ? '<button class="btn" type="button" data-page="prev">\u2190 Previous</button>' : '') +
+      (more ? '<button class="btn" type="button" data-page="next">Next \u2192</button>' : '') + '</div>';
+  }
+
+  function openPin(id){
+    var p = unpinned.list.filter(function(x){ return String(x.id) === String(id); })[0];
+    if (!p || !window.whrnxtPinPicker) return;
+    window.whrnxtPinPicker.open({
+      api: API,
+      title: p.name,
+      subtitle: (p.city || '') + ' \u2014 search for it, or drop a pin on the map. Dragging keeps the coordinate but drops the Google match.',
+      lat: p.lat, lng: p.lng,
+      name: p.name,
+      query: [p.name, p.city].filter(Boolean).join(', '),
+      onSave: function(res){ savePin(p, res); }
+    });
+  }
+
+  function savePin(p, res){
+    var out = document.querySelector('[data-pinout="' + CSS.escape(String(p.id)) + '"]');
+    if (out) { out.style.color = ''; out.textContent = 'Saving...'; }
+    api('/api/admin/places/' + encodeURIComponent(p.id) + '/location', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ lat: res.lat, lng: res.lng, placeId: res.placeId, address: res.address })
+    }).then(function(d){
+      var row = document.querySelector('[data-pid="' + CSS.escape(String(p.id)) + '"]');
+      if (row) { row.classList.add('gone'); setTimeout(function(){ row.remove(); }, 300); }
+      say(res.placeId
+        ? 'Pinned and matched to a Google place. It leaves this list.'
+        : 'Pinned by hand. Marked confirmed, recorded as set by an admin.', 'good');
+      api('/api/admin/summary').then(function(sm){ summary = sm; updatePills(); }).catch(function(){});
+    }).catch(function(e){
+      if (out) { out.style.color = 'var(--bad)'; out.textContent = e.message; }
+    });
   }
 
   function renderUsers(){
@@ -486,6 +588,16 @@ window.addEventListener('unhandledrejection', function (e) {
         summary = d; updatePills(); render(); say('');
       }).catch(fail);
     }
+    if (section === 'unpinned') {
+      busy = true; render(); say('Loading…');
+      return api('/api/admin/unpinned?limit=' + unpinned.limit + '&offset=' + unpinned.offset +
+                 (unpinned.q ? '&q=' + encodeURIComponent(unpinned.q) : ''))
+        .then(function(d){
+          busy = false;
+          unpinned.list = d.places || []; unpinned.total = d.total || 0;
+          render(); say('');
+        }).catch(function(e){ busy = false; fail(e); });
+    }
     busy = true; render(); say('Loading…');
     return api(QUEUES[section].queue + '?status=' + encodeURIComponent(status)).then(function(d){
       busy = false; renderQueue.data = d; render(); say('');
@@ -499,6 +611,9 @@ window.addEventListener('unhandledrejection', function (e) {
       var el = $(pair[1]);
       el.textContent = n; el.hidden = n === 0;
     });
+    var u = (summary.database && summary.database.unpinned) || 0;
+    var up = $('pill-unpinned');
+    if (up) { up.textContent = u.toLocaleString(); up.hidden = u === 0; }
   }
 
   function fail(e){
@@ -579,6 +694,18 @@ window.addEventListener('unhandledrejection', function (e) {
     if (go) { section = go.getAttribute('data-go'); status = 'pending'; renderQueue.data = null; load(); return; }
     var tab = e.target.closest('.tab[data-status]');
     if (tab) { status = tab.getAttribute('data-status'); renderQueue.data = null; load(); return; }
+    var pin = e.target.closest('[data-pin]');
+    if (pin) { openPin(pin.getAttribute('data-pin')); return; }
+    var page = e.target.closest('[data-page]');
+    if (page) {
+      unpinned.offset = Math.max(0, unpinned.offset + (page.getAttribute('data-page') === 'next' ? unpinned.limit : -unpinned.limit));
+      load(); return;
+    }
+    if (e.target.closest('#unp-go')) {
+      var qbox = $('unp-q');
+      unpinned.q = qbox ? qbox.value.trim() : '';
+      unpinned.offset = 0; load(); return;
+    }
     var save = e.target.closest('[data-savecity]');
     if (save) { saveCity(save.getAttribute('data-savecity'), save); return; }
     var opt = e.target.closest('[data-opt]');

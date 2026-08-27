@@ -1,0 +1,155 @@
+<script>
+// Shared pin picker: a map, a Google Places search, and a draggable marker.
+// The same interaction the trip builder uses to fix an unmatched stop, lifted
+// out so the admin can point it at a place that has no verified location.
+//
+//   whrnxtPinPicker.open({ api, title, subtitle, lat, lng, query, onSave })
+//
+// onSave receives { lat, lng, placeId, name, address }. placeId is only present
+// when the location came from picking a Google result — dragging a pin gives a
+// coordinate, not an identity, and pretending otherwise is what put half the
+// database in a state nobody could trust.
+(function () {
+  var el = null, map = null, marker = null, picked = null, cfg = null,
+      suggestions = [], timer = null;
+
+  function build() {
+    if (el) return el;
+    el = document.createElement('div');
+    el.className = 'pin-back';
+    el.hidden = true;
+    el.innerHTML =
+      '<div class="pin-card">' +
+        '<div class="pin-head"><strong id="pin-title">Set the location</strong>' +
+          '<button class="btn" type="button" id="pin-close">Close</button></div>' +
+        '<p class="fine" id="pin-sub"></p>' +
+        '<div class="pin-search">' +
+          '<input id="pin-q" placeholder="Search a place or address" autocomplete="off">' +
+          '<button class="btn" type="button" id="pin-find">Find</button>' +
+        '</div>' +
+        '<ul id="pin-suggest" class="find-suggest" style="display:none;position:static"></ul>' +
+        '<div id="pin-map"></div>' +
+        '<p class="fine" id="pin-at"></p>' +
+        '<button class="btn btn-signal" type="button" id="pin-use" style="width:100%">Use this location</button>' +
+      '</div>';
+    document.body.appendChild(el);
+
+    el.querySelector('#pin-close').addEventListener('click', close);
+    el.addEventListener('mousedown', function (e) { if (e.target === el) close(); });
+    el.querySelector('#pin-q').addEventListener('input', function () {
+      clearTimeout(timer); timer = setTimeout(search, 320);
+    });
+    el.querySelector('#pin-find').addEventListener('click', search);
+    el.querySelector('#pin-suggest').addEventListener('click', function (e) {
+      var li = e.target.closest('[data-i]');
+      if (li) choose(suggestions[+li.getAttribute('data-i')]);
+    });
+    el.querySelector('#pin-use').addEventListener('click', function () {
+      if (!picked || !cfg || !cfg.onSave) return close();
+      // Both captured before close(), which clears them. Reading cfg.onSave
+      // afterwards throws, and the throw looks exactly like the button doing
+      // nothing at all.
+      var out = picked;
+      var done = cfg.onSave;
+      close();
+      done(out);
+    });
+    return el;
+  }
+
+  function close() {
+    if (!el) return;
+    el.hidden = true;
+    if (map) { map.remove(); map = null; marker = null; }
+    suggestions = []; picked = null; cfg = null;
+    var box = el.querySelector('#pin-suggest');
+    if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+  }
+
+  function setPin(lat, lng, label, placeId, name, address) {
+    // Dragging keeps the name but drops the id: the coordinate is no longer the
+    // one Google gave for that place.
+    picked = { lat: lat, lng: lng, placeId: placeId || null,
+               name: name || (picked && picked.name) || '', address: address || '' };
+    el.querySelector('#pin-at').textContent =
+      (label ? label + ' — ' : '') + lat.toFixed(6) + ', ' + lng.toFixed(6) +
+      (placeId ? '  (matched to a Google place)' : '');
+    if (!map) return;
+    if (!marker) {
+      marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+      marker.on('dragend', function () {
+        var p = marker.getLatLng();
+        setPin(p.lat, p.lng, 'moved by hand', null, picked && picked.name, '');
+      });
+    } else marker.setLatLng([lat, lng]);
+  }
+
+  function drawMap() {
+    var host = el.querySelector('#pin-map');
+    if (!host || typeof L === 'undefined') {
+      if (host) host.innerHTML = '<p class="fine" style="padding:10px">Map failed to load — search instead, or paste coordinates.</p>';
+      return;
+    }
+    if (map) { map.remove(); map = null; marker = null; }
+    map = L.map(host, { zoomControl: true });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
+    var hasStart = picked && isFinite(picked.lat) && isFinite(picked.lng);
+    map.setView(hasStart ? [picked.lat, picked.lng] : [20, 0], hasStart ? 16 : 2);
+    map.on('click', function (e) { setPin(e.latlng.lat, e.latlng.lng, 'dropped', null, picked && picked.name, ''); });
+    setTimeout(function () { if (map) map.invalidateSize(); }, 60);
+    if (hasStart) setPin(picked.lat, picked.lng, 'current pin', picked.placeId, picked.name, picked.address);
+  }
+
+  function search() {
+    var q = el.querySelector('#pin-q').value.trim();
+    var box = el.querySelector('#pin-suggest');
+    if (q.length < 3) { box.style.display = 'none'; return; }
+    fetch(cfg.api + '/api/placesearch?q=' + encodeURIComponent(q))
+      .then(function (r) { return r.ok ? r.json() : { suggestions: [] }; })
+      .then(function (d) {
+        suggestions = d.suggestions || [];
+        if (!suggestions.length) { box.style.display = 'none'; return; }
+        box.innerHTML = suggestions.map(function (s, i) {
+          return '<li class="find-suggest-item" data-i="' + i + '">' +
+                 '<span class="find-suggest-name"></span><span class="find-suggest-sub"></span></li>';
+        }).join('');
+        // Names come from Google; they go in as text, never as markup.
+        Array.prototype.forEach.call(box.querySelectorAll('.find-suggest-item'), function (li, i) {
+          li.querySelector('.find-suggest-name').textContent = suggestions[i].name || '';
+          li.querySelector('.find-suggest-sub').textContent = suggestions[i].secondary || '';
+        });
+        box.style.display = '';
+      }).catch(function () { box.style.display = 'none'; });
+  }
+
+  function choose(s) {
+    if (!s) return;
+    el.querySelector('#pin-suggest').style.display = 'none';
+    fetch(cfg.api + '/api/place?id=' + encodeURIComponent(s.placeId))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d || typeof d.lat !== 'number') return;
+        if (map) map.setView([d.lat, d.lng], 17);
+        setPin(d.lat, d.lng, s.name, d.placeId || s.placeId, s.name, d.formattedAddress || '');
+      }).catch(function () {});
+  }
+
+  window.whrnxtPinPicker = {
+    open: function (opts) {
+      cfg = opts || {};
+      build();
+      picked = (isFinite(cfg.lat) && isFinite(cfg.lng))
+        ? { lat: Number(cfg.lat), lng: Number(cfg.lng), placeId: null, name: cfg.name || '', address: '' }
+        : { lat: NaN, lng: NaN, placeId: null, name: cfg.name || '', address: '' };
+      el.querySelector('#pin-title').textContent = cfg.title || 'Set the location';
+      el.querySelector('#pin-sub').textContent = cfg.subtitle || '';
+      el.querySelector('#pin-q').value = cfg.query || '';
+      el.querySelector('#pin-at').textContent = '';
+      el.hidden = false;
+      setTimeout(drawMap, 30);
+    },
+    close: close
+  };
+})();
+</script>
