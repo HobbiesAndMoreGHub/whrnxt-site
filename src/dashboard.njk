@@ -101,6 +101,11 @@ eleventyExcludeFromCollections: true
   .find-suggest-item:hover,.find-suggest-item.active{background:#1b2635}
   .statgo{display:block;width:100%;text-align:left;font:inherit;cursor:pointer}
   .statgo:hover{border-color:#3a4658}
+  .rm-box{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2)}
+  .rm-line{display:flex;gap:8px;flex-wrap:wrap}
+  .rm-line select,.rm-line input{flex:1 1 210px;min-width:0;background:#0d1117;border:1px solid var(--line);
+    color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px}
+  .rm-go{background:var(--bad);color:#160b0d;border-color:var(--bad);font-weight:700}
   .pin-filter{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
   .pin-filter input{flex:1;min-width:160px;background:var(--panel-2);border:1px solid var(--line);
     border-radius:8px;color:var(--ink);padding:8px 10px;font:inherit;font-size:14px}
@@ -161,6 +166,7 @@ eleventyExcludeFromCollections: true
     <button class="navb" data-sec="places">Place submissions <span class="pill" id="pill-places" hidden></span></button>
     <a class="navb" href="/admin/cms/">Articles &#8599;</a>
     <button class="navb" data-sec="unpinned">Unverified locations <span class="pill" id="pill-unpinned" hidden></span></button>
+    <button class="navb" data-sec="removed">Removed places</button>
     <button class="navb" data-sec="users">Users</button>
     <div class="side-foot">
       <div id="whoami"></div>
@@ -333,6 +339,7 @@ window.addEventListener('unhandledrejection', function (e) {
     trips:    { title:'Shared trips',       sub:'Links people submitted. Approving one puts it on /trips/.' },
     places:   { title:'Place submissions',  sub:'From /add-place/. Approving marks it ready for tools/promote_submissions.js, which resolves the real location and writes it into the data files.' },
     unpinned: { title:'Unverified locations', sub:'Places with no Google establishment id, so nothing has confirmed where they are. Pin one on the map and it becomes a location the app can trust.' },
+    removed:  { title:'Removed places',       sub:'Taken out of the database because there was nothing to pin \u2014 closed, moved, never there. Nothing is thrown away: the whole entry is kept here and can be put back. Run tools/sync_pg_to_data.js to carry a removal into the app.' },
     users:    { title:'Users',              sub:'Not built yet.' }
   };
 
@@ -382,6 +389,14 @@ window.addEventListener('unhandledrejection', function (e) {
     if (mins < 1440) return Math.round(mins/60) + 'h ago';
     return d.toLocaleDateString();
   }
+  // Ids come from the database, so a selector built from one has to survive an
+  // apostrophe. CSS.escape would do it and is not defined everywhere; escaping
+  // the two characters that can close a quoted attribute value is enough, and it
+  // depends on nothing.
+  function attr(name, val){
+    return '[' + name + '="' + String(val).replace(/(["\\])/g, '\\$1') + '"]';
+  }
+
   function safeHref(raw){
     var s = String(raw||'').trim();
     try { var u = new URL(s); return (u.protocol==='https:'||u.protocol==='http:') ? u.toString() : ''; }
@@ -396,10 +411,11 @@ window.addEventListener('unhandledrejection', function (e) {
       b.classList.toggle('on', b.getAttribute('data-sec') === section);
     });
     show($('tabs'), section === 'trips' || section === 'places');
-    if (section === 'unpinned') show($('tabs'), false);
+    if (section === 'unpinned' || section === 'removed') show($('tabs'), false);
     if (section === 'overview') return renderOverview();
     if (section === 'users')    return renderUsers();
     if (section === 'unpinned') return renderUnpinned();
+    if (section === 'removed')  return renderRemoved();
     return renderQueue();
   }
 
@@ -468,11 +484,114 @@ window.addEventListener('unhandledrejection', function (e) {
           '<button class="btn btn-signal rec-btn" data-pin="' + esc(p.id) + '">Set location</button>' +
           '<a class="btn rec-btn" href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent((p.name||'') + ' ' + (p.city||'')) + '" target="_blank" rel="nofollow noopener noreferrer">Google Maps \u2197</a>' +
           '<a class="btn rec-btn" href="https://www.google.com/search?q=' + encodeURIComponent((p.name||'') + ' ' + (p.city||'')) + '" target="_blank" rel="nofollow noopener noreferrer">Web \u2197</a>' +
+          '<button class="btn btn-ghost rec-btn" data-rm="' + esc(p.id) + '">Remove</button>' +
         '</div>' +
+        removeBox(p) +
         '<p class="meta" data-pinout="' + esc(p.id) + '"></p>' +
         '</div>';
     }).join('') + pager();
   }
+  // Removing asks why before it does anything. The reason is the point: a year
+  // from now a place that closed and a place that never existed are different
+  // problems, and a bare delete records neither. It is folded into the row
+  // rather than thrown up as a dialog so the place you are judging stays on
+  // screen while you judge it.
+  var REASONS = [
+    ['closed',        'Closed \u2014 it is not there any more'],
+    ['moved',         'Moved \u2014 the entry is wrong, not the place'],
+    ['duplicate',     'Duplicate of another entry'],
+    ['never_existed', 'Never existed / not a real place'],
+    ['other',         'Something else']
+  ];
+  function removeBox(p){
+    var id = esc(p.id);
+    return '<div class="rm-box" data-rmbox="' + id + '" hidden>' +
+      '<p class="fine" style="margin:0 0 8px">Why is <strong style="color:var(--ink)">' + esc(p.name) + '</strong> going?</p>' +
+      '<div class="rm-line">' +
+        '<select data-rmreason="' + id + '">' +
+          REASONS.map(function(r){ return '<option value="' + r[0] + '">' + esc(r[1]) + '</option>'; }).join('') +
+        '</select>' +
+        '<input data-rmnote="' + id + '" placeholder="Note (optional)" maxlength="300" autocomplete="off">' +
+      '</div>' +
+      '<div class="acts" style="margin-top:10px">' +
+        '<button class="btn rm-go" data-rmgo="' + id + '">Remove it</button>' +
+        '<button class="btn btn-ghost" data-rmcancel="' + id + '">Cancel</button>' +
+      '</div>' +
+      '<p class="fine" style="margin:8px 0 0">It goes to <strong style="color:var(--ink)">Removed places</strong>, where you can put it back.</p>' +
+    '</div>';
+  }
+
+  function toggleRemove(id, on){
+    var box = document.querySelector(attr('data-rmbox', id));
+    if (!box) return;
+    box.hidden = (on === false) ? true : !box.hidden;
+    if (!box.hidden) { var sel = box.querySelector('select'); if (sel) sel.focus(); }
+  }
+
+  function removePlace(id, btn){
+    var row = btn.closest('.row');
+    var sel = document.querySelector(attr('data-rmreason', id));
+    var note = document.querySelector(attr('data-rmnote', id));
+    var out = row && row.querySelector('[data-pinout]');
+    btn.disabled = true; btn.textContent = 'Removing...';
+    api('/api/admin/places/' + encodeURIComponent(id) + '/remove', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ reason: sel ? sel.value : 'other', note: note ? note.value.trim() : '' })
+    }).then(function(d){
+      if (row) { row.classList.add('gone'); setTimeout(function(){ row.remove(); }, 300); }
+      unpinned.list = unpinned.list.filter(function(x){ return String(x.id) !== String(id); });
+      unpinned.total = Math.max(0, unpinned.total - 1);
+      say('Removed \u2014 kept under Removed places. Run tools/sync_pg_to_data.js to take it out of the app too.', 'good');
+      api('/api/admin/summary').then(function(sm){ summary = sm; updatePills(); }).catch(function(){});
+    }).catch(function(e){
+      btn.disabled = false; btn.textContent = 'Remove it';
+      if (out) { out.style.color = 'var(--bad)'; out.textContent = e.message; }
+    });
+  }
+
+  // removed places
+  var removed = { list: [], total: 0 };
+
+  function renderRemoved(){
+    var b = $('body');
+    if (busy) { b.innerHTML = '<div class="empty">Loading\u2026</div>'; return; }
+    if (!removed.list.length) {
+      b.innerHTML = '<div class="empty">Nothing has been removed.</div>';
+      return;
+    }
+    b.innerHTML =
+      '<p class="fine" style="margin:0 0 14px">' + removed.total.toLocaleString() +
+      ' removed. They are out of the database but not gone \u2014 Put back restores the entry exactly as it was.</p>' +
+      removed.list.map(function(r){
+        return '<div class="row" data-rid="' + esc(r.id) + '">' +
+          '<span class="label">' + esc(r.city || 'no city') + (r.category ? ' \u00b7 ' + esc(r.category) : '') + '</span>' +
+          '<h3>' + esc(r.name || r.id) + '</h3>' +
+          '<p class="meta">' + esc(r.reason || 'no reason given') +
+            ' \u00b7 ' + esc(String(r.removed_at || '').slice(0, 10)) +
+            (r.removed_by ? ' \u00b7 ' + esc(r.removed_by) : '') + '</p>' +
+          '<div class="acts"><button class="btn" data-restore="' + esc(r.id) + '">Put back</button></div>' +
+          '<p class="meta" data-rout="' + esc(r.id) + '"></p>' +
+          '</div>';
+      }).join('');
+  }
+
+  function restorePlace(id, btn){
+    var out = document.querySelector(attr('data-rout', id));
+    btn.disabled = true; btn.textContent = 'Restoring...';
+    api('/api/admin/removed/' + encodeURIComponent(id) + '/restore', { method:'POST' })
+      .then(function(){
+        var row = document.querySelector(attr('data-rid', id));
+        if (row) { row.classList.add('gone'); setTimeout(function(){ row.remove(); }, 300); }
+        removed.list = removed.list.filter(function(x){ return String(x.id) !== String(id); });
+        removed.total = Math.max(0, removed.total - 1);
+        say('Back in the database. It returns to Unverified locations until it has a confirmed location.', 'good');
+        api('/api/admin/summary').then(function(sm){ summary = sm; updatePills(); }).catch(function(){});
+      }).catch(function(e){
+        btn.disabled = false; btn.textContent = 'Put back';
+        if (out) { out.style.color = 'var(--bad)'; out.textContent = e.message; }
+      });
+  }
+
   function pager(){
     var more = unpinned.offset + unpinned.limit < unpinned.total;
     var back = unpinned.offset > 0;
@@ -505,13 +624,13 @@ window.addEventListener('unhandledrejection', function (e) {
   }
 
   function savePin(p, res){
-    var out = document.querySelector('[data-pinout="' + CSS.escape(String(p.id)) + '"]');
+    var out = document.querySelector(attr('data-pinout', p.id));
     if (out) { out.style.color = ''; out.textContent = 'Saving...'; }
     api('/api/admin/places/' + encodeURIComponent(p.id) + '/location', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ lat: res.lat, lng: res.lng, placeId: res.placeId, address: res.address })
     }).then(function(d){
-      var row = document.querySelector('[data-pid="' + CSS.escape(String(p.id)) + '"]');
+      var row = document.querySelector(attr('data-pid', p.id));
       if (row) { row.classList.add('gone'); setTimeout(function(){ row.remove(); }, 300); }
       say(res.placeId
         ? 'Pinned and matched to a Google place. It leaves this list.'
@@ -624,6 +743,14 @@ window.addEventListener('unhandledrejection', function (e) {
           render(); say('');
         }).catch(function(e){ busy = false; fail(e); });
     }
+    if (section === 'removed') {
+      busy = true; render(); say('Loading…');
+      return api('/api/admin/removed?limit=200').then(function(d){
+        busy = false;
+        removed.list = d.removed || []; removed.total = d.total || 0;
+        render(); say('');
+      }).catch(function(e){ busy = false; fail(e); });
+    }
     busy = true; render(); say('Loading…');
     return api(QUEUES[section].queue + '?status=' + encodeURIComponent(status)).then(function(d){
       busy = false; renderQueue.data = d; render(); say('');
@@ -722,6 +849,14 @@ window.addEventListener('unhandledrejection', function (e) {
     if (tab) { status = tab.getAttribute('data-status'); renderQueue.data = null; load(); return; }
     var pin = e.target.closest('[data-pin]');
     if (pin) { openPin(pin.getAttribute('data-pin')); return; }
+    var rm = e.target.closest('[data-rm]');
+    if (rm) { toggleRemove(rm.getAttribute('data-rm')); return; }
+    var rmc = e.target.closest('[data-rmcancel]');
+    if (rmc) { toggleRemove(rmc.getAttribute('data-rmcancel'), false); return; }
+    var rmg = e.target.closest('[data-rmgo]');
+    if (rmg) { removePlace(rmg.getAttribute('data-rmgo'), rmg); return; }
+    var rst = e.target.closest('[data-restore]');
+    if (rst) { restorePlace(rst.getAttribute('data-restore'), rst); return; }
     var page = e.target.closest('[data-page]');
     if (page) {
       unpinned.offset = Math.max(0, unpinned.offset + (page.getAttribute('data-page') === 'next' ? unpinned.limit : -unpinned.limit));
