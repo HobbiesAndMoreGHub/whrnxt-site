@@ -337,7 +337,7 @@ window.addEventListener('unhandledrejection', function (e) {
     overview: { title:'Overview',           sub:'What is waiting, and what is in the database.' },
     trips:    { title:'Shared trips',       sub:'Links people submitted. Approving one puts it on /trips/.' },
     places:   { title:'Place submissions',  sub:'From /add-place/. Approving marks it ready for tools/promote_submissions.js, which resolves the real location and writes it into the data files.' },
-    unpinned: { title:'Unverified locations', sub:'Places with no Google establishment id, so nothing has confirmed where they are. Pin one on the map and it becomes a location the app can trust.' },
+    unpinned: { title:'Unverified locations', sub:'Places with no Google establishment id, so nothing has confirmed where they are. Pin one and it leaves this list for good \u2014 whether Google matched it or you placed it yourself.' },
     removed:  { title:'Removed places',       sub:'Taken out of the database because there was nothing to pin \u2014 closed, moved, never there. Nothing is thrown away: the whole entry is kept here and can be put back. Run tools/sync_pg_to_data.js to carry a removal into the app.' },
     users:    { title:'Users',              sub:'Not built yet.' }
   };
@@ -444,7 +444,7 @@ window.addEventListener('unhandledrejection', function (e) {
         stat((d.total||0).toLocaleString(), 'places in the database') +
         stat((d.cities||0).toLocaleString(), 'cities') +
         stat((d.confirmed||0).toLocaleString(), 'location confirmed') +
-        statLink((d.unpinned||0).toLocaleString(), 'without a Google id', 'unpinned', (d.unpinned||0)>0) +
+        statLink((d.unpinned||0).toLocaleString(), 'still need a location', 'unpinned', (d.unpinned||0)>0) +
       '</div>' +
       (waiting
         ? '<div class="row"><h3>' + waiting + ' item' + (waiting===1?'':'s') + ' waiting for you</h3>' +
@@ -651,7 +651,7 @@ window.addEventListener('unhandledrejection', function (e) {
       if (row) { row.classList.add('gone'); setTimeout(function(){ row.remove(); }, 300); }
       say(res.placeId
         ? 'Pinned and matched to a Google place. It leaves this list.'
-        : 'Pinned by hand. Marked confirmed, recorded as set by an admin.', 'good');
+        : 'Pinned by hand \u2014 saved, marked confirmed, and recorded as set by an admin. Google had no establishment to match (a street or an area, usually), which is fine: it leaves this list either way.', 'good');
       api('/api/admin/summary').then(function(sm){ summary = sm; updatePills(); }).catch(function(){});
     }).catch(function(e){
       if (out) { out.style.color = 'var(--bad)'; out.textContent = e.message; }
