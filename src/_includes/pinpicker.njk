@@ -11,7 +11,36 @@
 // database in a state nobody could trust.
 (function () {
   var el = null, map = null, marker = null, picked = null, cfg = null,
-      suggestions = [], timer = null;
+      suggestions = [], timer = null, gmapsPromise = null;
+
+  // Google tiles when a browser key is configured, OpenStreetMap otherwise.
+  //
+  // This is not the choice the app makes. The app draws maps for everyone and
+  // OSM is free; this draws them for whoever is fixing the database, a few times
+  // a day, and finding one unlabelled building among stylised beige shapes is
+  // the whole difficulty of the job. Google labels the places, which is the
+  // point. Maps JavaScript is 10,000 loads a month free, and admin use is
+  // nowhere near it.
+  //
+  // The key has to be a SECOND one, restricted by HTTP referrer to this domain
+  // and to Maps JavaScript alone. The existing key cannot be reused: it is used
+  // in eleven places server-side and by the local tools, none of which send a
+  // referrer, so restricting it would break all of them.
+  function loadGoogleMaps(key) {
+    if (gmapsPromise) return gmapsPromise;
+    gmapsPromise = new Promise(function (resolve, reject) {
+      if (window.google && window.google.maps) return resolve(window.google.maps);
+      var cb = 'whrnxtGmapsReady';
+      window[cb] = function () { resolve(window.google.maps); };
+      var sc = document.createElement('script');
+      sc.async = true;
+      sc.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key) +
+               '&libraries=marker&loading=async&callback=' + cb;
+      sc.onerror = function () { reject(new Error('Google Maps failed to load')); };
+      document.head.appendChild(sc);
+    });
+    return gmapsPromise;
+  }
 
   function build() {
     if (el) return el;
@@ -60,7 +89,14 @@
   function close() {
     if (!el) return;
     el.hidden = true;
-    if (map) { map.remove(); map = null; marker = null; }
+    // Only Leaflet has remove(); a Google map is discarded by dropping the
+    // reference and emptying its host.
+    if (map) {
+      if (!map.__google && map.remove) map.remove();
+      map = null; marker = null;
+      var host = el.querySelector('#pin-map');
+      if (host) host.innerHTML = '';
+    }
     suggestions = []; picked = null; cfg = null;
     var box = el.querySelector('#pin-suggest');
     if (box) { box.style.display = 'none'; box.innerHTML = ''; }
@@ -75,6 +111,15 @@
       (label ? label + ' — ' : '') + lat.toFixed(6) + ', ' + lng.toFixed(6) +
       (placeId ? '  (matched to a Google place)' : '');
     if (!map) return;
+    if (map.__google) {
+      if (!marker) {
+        marker = new google.maps.Marker({ map: map, position: { lat: lat, lng: lng }, draggable: true });
+        marker.addListener('dragend', function (e) {
+          setPin(e.latLng.lat(), e.latLng.lng(), 'moved by hand', null, picked && picked.name, '');
+        });
+      } else marker.setPosition({ lat: lat, lng: lng });
+      return;
+    }
     if (!marker) {
       marker = L.marker([lat, lng], { draggable: true }).addTo(map);
       marker.on('dragend', function () {
@@ -86,11 +131,41 @@
 
   function drawMap() {
     var host = el.querySelector('#pin-map');
-    if (!host || typeof L === 'undefined') {
-      if (host) host.innerHTML = '<p class="fine" style="padding:10px">Map failed to load — search instead, or paste coordinates.</p>';
+    if (!host) return;
+    if (cfg && cfg.mapsKey) {
+      loadGoogleMaps(cfg.mapsKey).then(function () { drawGoogle(host); })
+        .catch(function () { drawLeaflet(host); });   // key rejected, still usable
       return;
     }
-    if (map) { map.remove(); map = null; marker = null; }
+    drawLeaflet(host);
+  }
+
+  function drawGoogle(host) {
+    var hasStart = picked && isFinite(picked.lat) && isFinite(picked.lng);
+    map = new google.maps.Map(host, {
+      center: hasStart ? { lat: picked.lat, lng: picked.lng } : { lat: 20, lng: 0 },
+      zoom: hasStart ? 17 : 2,
+      mapTypeId: 'roadmap',
+      // The controls that matter for this job: satellite, because a building is
+      // often easier to recognise from above than from a label.
+      mapTypeControl: true,
+      streetViewControl: false,
+      fullscreenControl: false,
+    });
+    map.__google = true;
+    marker = null;
+    map.addListener('click', function (e) {
+      setPin(e.latLng.lat(), e.latLng.lng(), 'dropped', null, picked && picked.name, '');
+    });
+    if (hasStart) setPin(picked.lat, picked.lng, 'current pin', picked.placeId, picked.name, picked.address);
+  }
+
+  function drawLeaflet(host) {
+    if (typeof L === 'undefined') {
+      host.innerHTML = '<p class="fine" style="padding:10px">Map failed to load — search instead, or paste coordinates.</p>';
+      return;
+    }
+    if (map) { if (map.remove) map.remove(); map = null; marker = null; }
     map = L.map(host, { zoomControl: true });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
       { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
@@ -130,7 +205,10 @@
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
         if (!d || typeof d.lat !== 'number') return;
-        if (map) map.setView([d.lat, d.lng], 17);
+        if (map) {
+          if (map.__google) { map.setCenter({ lat: d.lat, lng: d.lng }); map.setZoom(17); }
+          else map.setView([d.lat, d.lng], 17);
+        }
         setPin(d.lat, d.lng, s.name, d.placeId || s.placeId, s.name, d.formattedAddress || '');
       }).catch(function () {});
   }
