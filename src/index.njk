@@ -20,7 +20,7 @@ layout: base.njk
     </div>
     <div class="demo" id="demo">
       <div class="demo-bar">
-        <span class="demo-status mono" id="demo-mode"><span class="demo-dot"></span>BROWSING MODE &mdash; location set as Rome, Italy.</span>
+        <span class="demo-status mono" id="demo-mode"><span class="demo-dot"></span>BROWSING MODE &mdash; location set as Rome.</span>
       </div>
       <div class="demo-screen">
         <iframe
@@ -168,6 +168,20 @@ layout: base.njk
     if(frame.contentWindow) frame.contentWindow.postMessage({type:type}, APP_ORIGIN);
   }
 
+  // Just the city. The database qualifies names so they can be told apart when
+  // you are choosing one — "Rome, Italy", "Aberdeen (SD, USA)" — but this line
+  // is not a chooser, and on a phone the qualifier is what gets cut off, so the
+  // sentence ends mid-word. Anyone reading "Browsing Rome" knows where Rome is.
+  //
+  // Both shapes appear in the data: a comma for most, parentheses for the 1,461
+  // US entries that need a state. Cut at whichever comes first.
+  function shortCity(name){
+    var s = String(name || '').trim();
+    var cut = s.length;
+    [s.indexOf(','), s.indexOf(' (')].forEach(function(i){ if (i > 0 && i < cut) cut = i; });
+    return s.slice(0, cut).trim() || s;
+  }
+
   // Rebuild the status line as nodes — the city name crosses a frame boundary,
   // so it goes in as text, never as markup.
   function setMode(text){
@@ -200,7 +214,7 @@ layout: base.njk
     } else {
       locate.dataset.mode = 'browse';
       locate.textContent = 'Use my location ▸';
-      var city = d.cityName || 'Rome, Italy';
+      var city = shortCity(d.cityName) || 'Rome';
       setMode('BROWSING MODE — location set as ' + city + '.');
       fine.textContent = 'Browsing ' + city + ' — no location needed. Pick any city inside, or switch to where you actually are.';
     }
