@@ -11,6 +11,13 @@ permalink: /trips/index.html
     <p>Trips other travelers built and posted. Open one in the app and it becomes yours to follow, edit, or reorder. Every trip is reviewed by a person before it shows up here.</p>
   </div>
 
+  <!-- Built from the trips that actually loaded, so it can never offer a city
+       with nothing behind it. Hidden until then. -->
+  <div class="trip-filter" id="trip-filter" hidden>
+    <span class="label">Filter by city</span>
+    <div class="chips" id="trip-chips" role="group" aria-label="Filter trips by city"></div>
+  </div>
+
   <div class="trip-list" id="trip-list">
     <p class="trip-loading" id="trip-loading">Loading trips…</p>
   </div>
@@ -75,15 +82,78 @@ permalink: /trips/index.html
         if (b === 'Elsewhere') return -1;
         return a.localeCompare(b);
       }).forEach(function(key){
+        var sec = document.createElement('div');
+        sec.className = 'trip-group-wrap';
+        sec.setAttribute('data-city', key);
         var h = document.createElement('h3');
         h.className = 'trip-group';
         h.textContent = key;
-        list.appendChild(h);
-        groups[key].forEach(function(t){ list.appendChild(card(t)); });
+        sec.appendChild(h);
+        groups[key].forEach(function(t){ sec.appendChild(card(t)); });
+        list.appendChild(sec);
       });
+
+      buildFilter(groups);
     })
     .catch(function(){
       loading.textContent = 'Could not load trips just now — please try again shortly.';
     });
+
+  // One city at a time, because that is how people arrive at this page: they
+  // want somewhere, not everywhere. With only a handful of cities a dropdown
+  // would be a click to see what the options even are, so the options are the
+  // control.
+  function buildFilter(groups){
+    var keys = Object.keys(groups);
+    if (keys.length < 2) return;            // nothing to filter between
+
+    var wrap = document.getElementById('trip-filter');
+    var chips = document.getElementById('trip-chips');
+    var order = keys.sort(function(a, b){
+      if (a === 'Elsewhere') return 1;
+      if (b === 'Elsewhere') return -1;
+      return a.localeCompare(b);
+    });
+
+    function chip(city, label, count){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip';
+      b.setAttribute('data-city', city);
+      b.textContent = label;
+      var n = document.createElement('span');
+      n.className = 'chip-n';
+      n.textContent = count;
+      b.appendChild(n);
+      return b;
+    }
+
+    var total = keys.reduce(function(n, k){ return n + groups[k].length; }, 0);
+    chips.appendChild(chip('', 'All', total));
+    order.forEach(function(k){ chips.appendChild(chip(k, k, groups[k].length)); });
+    wrap.hidden = false;
+    select('');
+
+    function select(city){
+      Array.prototype.forEach.call(chips.querySelectorAll('.chip'), function(b){
+        var on = b.getAttribute('data-city') === city;
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      Array.prototype.forEach.call(list.querySelectorAll('.trip-group-wrap'), function(sec){
+        sec.hidden = !!city && sec.getAttribute('data-city') !== city;
+      });
+      // With one city showing, its heading is repeating the chip you just
+      // pressed. Keep it when everything is shown, where it is doing work.
+      Array.prototype.forEach.call(list.querySelectorAll('.trip-group'), function(h){
+        h.hidden = !!city;
+      });
+    }
+
+    chips.addEventListener('click', function(e){
+      var b = e.target.closest('.chip');
+      if (b) select(b.getAttribute('data-city'));
+    });
+  }
 })();
 </script>{% endraw %}

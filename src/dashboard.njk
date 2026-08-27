@@ -103,6 +103,20 @@ eleventyExcludeFromCollections: true
   .statgo:hover{border-color:#3a4658}
   .desc{margin:6px 0 0;color:var(--ink);font-size:13.5px;line-height:1.5;max-width:70ch}
   .alt{color:var(--muted);font-weight:400;font-size:.82em}
+  .enrich-filter select,.enrich-filter input{background:#0d1117;border:1px solid var(--line);color:var(--ink);
+    border-radius:8px;padding:8px 10px;font:inherit;font-size:13px}
+  .enrich-filter input{flex:1 1 180px;min-width:0}
+  .en-grid{display:grid;grid-template-columns:132px 1fr;gap:16px;align-items:start}
+  .en-shot img{width:132px;height:96px;object-fit:cover;border-radius:8px;display:block;background:#0d1117}
+  .en-nopic{width:132px;height:96px;border:1px dashed var(--line);border-radius:8px;display:flex;
+    align-items:center;justify-content:center;color:var(--muted);font-size:12px;text-align:center}
+  .en-body{min-width:0}
+  .rm-box textarea{width:100%;background:#0d1117;border:1px solid var(--line);color:var(--ink);
+    border-radius:8px;padding:8px 10px;font:inherit;font-size:13.5px;line-height:1.5;resize:vertical}
+  @media(max-width:640px){
+    .en-grid{grid-template-columns:1fr}
+    .en-shot img,.en-nopic{width:100%;height:150px}
+  }
   .rm-box{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2)}
   .rm-go{background:var(--bad);color:#160b0d;border-color:var(--bad);font-weight:700}
   .pin-filter{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
@@ -165,6 +179,7 @@ eleventyExcludeFromCollections: true
     <button class="navb" data-sec="places">Place submissions <span class="pill" id="pill-places" hidden></span></button>
     <a class="navb" href="/admin/cms/">Articles &#8599;</a>
     <button class="navb" data-sec="unpinned">Unverified locations <span class="pill" id="pill-unpinned" hidden></span></button>
+    <button class="navb" data-sec="enrich">Pictures &amp; text <span class="pill" id="pill-enrich" hidden></span></button>
     <button class="navb" data-sec="removed">Removed places</button>
     <button class="navb" data-sec="users">Users</button>
     <div class="side-foot">
@@ -338,6 +353,7 @@ window.addEventListener('unhandledrejection', function (e) {
     trips:    { title:'Shared trips',       sub:'Links people submitted. Approving one puts it on /trips/.' },
     places:   { title:'Place submissions',  sub:'From /add-place/. Approving marks it ready for tools/promote_submissions.js, which resolves the real location and writes it into the data files.' },
     unpinned: { title:'Unverified locations', sub:'Places with no Google establishment id, so nothing has confirmed where they are. Pin one and it leaves this list for good \u2014 whether Google matched it or you placed it yourself.' },
+    enrich:   { title:'Pictures & text',      sub:'What is thin or missing, and the words you can do something about. Filter down to a city first \u2014 38,000 places have no picture, and no list that long is a to-do list.' },
     removed:  { title:'Removed places',       sub:'Taken out of the database because there was nothing to pin \u2014 closed, moved, never there. Nothing is thrown away: the whole entry is kept here and can be put back. Run tools/sync_pg_to_data.js to carry a removal into the app.' },
     users:    { title:'Users',              sub:'Not built yet.' }
   };
@@ -392,6 +408,152 @@ window.addEventListener('unhandledrejection', function (e) {
   // apostrophe. CSS.escape would do it and is not defined everywhere; escaping
   // the two characters that can close a quoted attribute value is enough, and it
   // depends on nothing.
+  // ── pictures & text ───────────────────────────────────────────────────────
+  //
+  // Images are stored as repo-relative paths (img/places/paris-014.jpg) because
+  // the app serves them from its own origin. The admin is on a different one, so
+  // the thumbnail has to be resolved against the app.
+  var APP_ORIGIN = {{ site.appUrl | dump | safe }};
+  var MISSING = [
+    ['picture',     'No picture'],
+    ['thin',        'Thin description'],
+    ['description', 'No description at all'],
+    ['edited',      'Edited here'],
+    ['',            'Everything']
+  ];
+  var enrich = { list: [], total: 0, offset: 0, limit: 25, q: '', city: '', missing: 'picture', cities: [], citiesFor: null };
+
+  function enrichHead(){
+    return '<div class="pin-filter enrich-filter">' +
+      '<select id="en-missing">' +
+        MISSING.map(function(m){
+          return '<option value="' + m[0] + '"' + (m[0] === enrich.missing ? ' selected' : '') + '>' + esc(m[1]) + '</option>';
+        }).join('') +
+      '</select>' +
+      '<select id="en-city">' +
+        '<option value="">Every city</option>' +
+        enrich.cities.map(function(c){
+          return '<option value="' + esc(c.city) + '"' + (c.city === enrich.city ? ' selected' : '') + '>' +
+            esc(c.city) + ' (' + c.n + ')</option>';
+        }).join('') +
+      '</select>' +
+      '<input id="en-q" placeholder="Name contains..." value="' + esc(enrich.q) + '" autocomplete="off">' +
+      '<button class="btn" type="button" id="en-go">Filter</button>' +
+      '<span class="fine">' + (enrich.total
+        ? (enrich.offset + 1) + '\u2013' + Math.min(enrich.offset + enrich.limit, enrich.total) + ' of ' + enrich.total.toLocaleString()
+        : '0') + '</span>' +
+    '</div>';
+  }
+
+  function renderEnrich(){
+    var b = $('body');
+    if (busy) { b.innerHTML = enrichHead() + '<div class="empty">Loading\u2026</div>'; return; }
+    if (!enrich.list.length) {
+      b.innerHTML = enrichHead() + '<div class="empty">Nothing matches that.</div>';
+      return;
+    }
+    b.innerHTML = enrichHead() + enrich.list.map(function(p){
+      var img = p.image ? (/^https?:/.test(p.image) ? p.image : APP_ORIGIN.replace(/\/$/, '') + '/' + String(p.image).replace(/^\//, '')) : '';
+      return '<div class="row en-row" data-eid="' + esc(p.id) + '">' +
+        '<div class="en-grid">' +
+          '<div class="en-shot">' +
+            (img
+              ? '<img src="' + esc(img) + '" alt="" loading="lazy" referrerpolicy="no-referrer">'
+              : '<div class="en-nopic">no picture</div>') +
+          '</div>' +
+          '<div class="en-body">' +
+            '<span class="label">' + esc(p.city || '') + (p.category ? ' \u00b7 ' + esc(p.category) : '') +
+              (p.major ? ' \u00b7 major' : '') +
+              (p.text_edited_at ? ' \u00b7 edited ' + esc(String(p.text_edited_at).slice(0, 10)) : '') + '</span>' +
+            '<h3>' + esc(p.name) + (p.local_name ? ' <span class="alt">' + esc(p.local_name) + '</span>' : '') + '</h3>' +
+            '<p class="desc" data-endesc="' + esc(p.id) + '">' + esc(p.description || '(no description)') + '</p>' +
+            (p.image_attribution ? '<p class="meta">' + esc(p.image_attribution) + '</p>' : '') +
+            '<div class="acts">' +
+              '<button class="btn btn-signal rec-btn" data-enedit="' + esc(p.id) + '">Edit text</button>' +
+              '<a class="btn rec-btn" href="' + gmaps((p.name||'') + ' ' + (p.city||'')) + '" target="_blank" rel="nofollow noopener noreferrer">Google Maps \u2197</a>' +
+              (safeHref(p.website) ? '<a class="btn rec-btn" href="' + esc(safeHref(p.website)) + '" target="_blank" rel="nofollow noopener noreferrer">Website \u2197</a>' : '') +
+              (safeHref(p.wiki) ? '<a class="btn rec-btn" href="' + esc(safeHref(p.wiki)) + '" target="_blank" rel="nofollow noopener noreferrer">Wikipedia \u2197</a>' : '') +
+            '</div>' +
+            editBox(p) +
+            '<p class="meta" data-enout="' + esc(p.id) + '"></p>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('') + enrichPager();
+  }
+
+  function editBox(p){
+    var id = esc(p.id);
+    return '<div class="rm-box" data-enbox="' + id + '" hidden>' +
+      '<label class="fine" for="ed-d-' + id + '">Description</label>' +
+      '<textarea id="ed-d-' + id + '" data-endescin="' + id + '" rows="3" maxlength="1200">' + esc(p.description || '') + '</textarea>' +
+      '<div class="rm-line" style="margin-top:8px">' +
+        '<input data-enlocal="' + id + '" placeholder="Local name (optional)" maxlength="160" value="' + esc(p.local_name || '') + '" autocomplete="off">' +
+        '<input data-ensite="' + id + '" placeholder="https://website (optional)" maxlength="500" value="' + esc(p.website || '') + '" autocomplete="off">' +
+      '</div>' +
+      '<div class="acts" style="margin-top:10px">' +
+        '<button class="btn btn-signal" data-ensave="' + id + '">Save text</button>' +
+        '<button class="btn btn-ghost" data-encancel="' + id + '">Cancel</button>' +
+      '</div>' +
+      '<p class="fine" style="margin:10px 0 0">Saved here, then carried into the app by the next publish.</p>' +
+    '</div>';
+  }
+
+  function enrichPager(){
+    var more = enrich.offset + enrich.limit < enrich.total;
+    var back = enrich.offset > 0;
+    if (!more && !back) return '';
+    return '<div class="acts" style="margin-top:14px">' +
+      (back ? '<button class="btn" type="button" data-enpage="prev">\u2190 Previous</button>' : '') +
+      (more ? '<button class="btn" type="button" data-enpage="next">Next \u2192</button>' : '') + '</div>';
+  }
+
+  function toggleEdit(id, on){
+    var box = document.querySelector(attr('data-enbox', id));
+    if (!box) return;
+    box.hidden = (on === false) ? true : !box.hidden;
+    if (!box.hidden) { var ta = box.querySelector('textarea'); if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } }
+  }
+
+  function saveText(id, btn){
+    var d = document.querySelector(attr('data-endescin', id));
+    var ln = document.querySelector(attr('data-enlocal', id));
+    var ws = document.querySelector(attr('data-ensite', id));
+    var out = document.querySelector(attr('data-enout', id));
+    if (!d) return;
+    if (!d.value.trim()) {
+      if (out) { out.style.color = 'var(--bad)'; out.textContent = 'A description is what this screen is for — it cannot be emptied.'; }
+      return;
+    }
+    var was = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Saving...';
+    if (out) { out.style.color = ''; out.textContent = ''; }
+    api('/api/admin/places/' + encodeURIComponent(id) + '/text', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ description: d.value, localName: ln ? ln.value : '', website: ws ? ws.value : '' })
+    }).then(function(r){
+      btn.disabled = false; btn.textContent = was;
+      var p = r.place || {};
+      // Update the row in place rather than reloading: a reload with "no
+      // description" selected would make the row you just fixed vanish, which
+      // reads as having lost the edit.
+      var shown = document.querySelector(attr('data-endesc', id));
+      if (shown) shown.textContent = p.description || '';
+      enrich.list.forEach(function(x){
+        if (String(x.id) === String(id)) {
+          x.description = p.description; x.local_name = p.local_name;
+          x.website = p.website; x.text_edited_at = p.text_edited_at;
+        }
+      });
+      toggleEdit(id, false);
+      say('Saved. It reaches the app on the next publish.', 'good');
+      api('/api/admin/summary').then(function(sm){ summary = sm; updatePills(); }).catch(function(){});
+    }).catch(function(e){
+      btn.disabled = false; btn.textContent = was;
+      if (out) { out.style.color = 'var(--bad)'; out.textContent = e.message; }
+    });
+  }
+
   // ── publishing ────────────────────────────────────────────────────────────
   //
   // Pinning and removing write to Postgres. The app does not read Postgres: it
@@ -541,11 +703,12 @@ window.addEventListener('unhandledrejection', function (e) {
       b.classList.toggle('on', b.getAttribute('data-sec') === section);
     });
     show($('tabs'), section === 'trips' || section === 'places');
-    if (section === 'unpinned' || section === 'removed') show($('tabs'), false);
+    if (section === 'unpinned' || section === 'removed' || section === 'enrich') show($('tabs'), false);
     if (section === 'overview') return renderOverview();
     if (section === 'users')    return renderUsers();
     if (section === 'unpinned') return renderUnpinned();
     if (section === 'removed')  return renderRemoved();
+    if (section === 'enrich')   return renderEnrich();
     return renderQueue();
   }
 
@@ -566,6 +729,7 @@ window.addEventListener('unhandledrejection', function (e) {
         stat((d.cities||0).toLocaleString(), 'cities') +
         stat((d.confirmed||0).toLocaleString(), 'location confirmed') +
         statLink((d.unpinned||0).toLocaleString(), 'still need a location', 'unpinned', (d.unpinned||0)>0) +
+        statLink((d.no_picture||0).toLocaleString(), 'without a picture', 'enrich') +
       '</div>' +
       '<div class="row"><h3>Publish to the app</h3>' +
         '<p>Locations you pin and places you remove are saved straight away, but they live in the database until the app is rebuilt from it. ' +
@@ -888,6 +1052,27 @@ window.addEventListener('unhandledrejection', function (e) {
           render(); say('');
         }).catch(function(e){ busy = false; fail(e); });
     }
+    if (section === 'enrich') {
+      busy = true; render(); say('Loading…');
+      // The city list depends on the missing-filter, so it is refetched when
+      // that changes and reused when it has not.
+      var needCities = enrich.citiesFor !== enrich.missing;
+      var cityReq = needCities
+        ? api('/api/admin/place-cities?missing=' + encodeURIComponent(enrich.missing))
+            .then(function(d){ enrich.cities = d.cities || []; enrich.citiesFor = enrich.missing; })
+            .catch(function(){ enrich.cities = []; })
+        : Promise.resolve();
+      return cityReq.then(function(){
+        return api('/api/admin/places?limit=' + enrich.limit + '&offset=' + enrich.offset +
+                   '&missing=' + encodeURIComponent(enrich.missing) +
+                   (enrich.city ? '&city=' + encodeURIComponent(enrich.city) : '') +
+                   (enrich.q ? '&q=' + encodeURIComponent(enrich.q) : ''));
+      }).then(function(d){
+        busy = false;
+        enrich.list = d.places || []; enrich.total = d.total || 0;
+        render(); say('');
+      }).catch(function(e){ busy = false; fail(e); });
+    }
     if (section === 'removed') {
       busy = true; render(); say('Loading…');
       return api('/api/admin/removed?limit=200').then(function(d){
@@ -909,6 +1094,9 @@ window.addEventListener('unhandledrejection', function (e) {
       var el = $(pair[1]);
       el.textContent = n; el.hidden = n === 0;
     });
+    var np = (summary.database && summary.database.no_picture) || 0;
+    var ep = $('pill-enrich');
+    if (ep) { ep.textContent = np.toLocaleString(); ep.hidden = np === 0; }
     var u = (summary.database && summary.database.unpinned) || 0;
     var up = $('pill-unpinned');
     if (up) { up.textContent = u.toLocaleString(); up.hidden = u === 0; }
@@ -1004,6 +1192,24 @@ window.addEventListener('unhandledrejection', function (e) {
     if (rmg) { removePlace(rmg.getAttribute('data-rmgo'), rmg); return; }
     var rst = e.target.closest('[data-restore]');
     if (rst) { restorePlace(rst.getAttribute('data-restore'), rst); return; }
+    var eed = e.target.closest('[data-enedit]');
+    if (eed) { toggleEdit(eed.getAttribute('data-enedit')); return; }
+    var eec = e.target.closest('[data-encancel]');
+    if (eec) { toggleEdit(eec.getAttribute('data-encancel'), false); return; }
+    var ees = e.target.closest('[data-ensave]');
+    if (ees) { saveText(ees.getAttribute('data-ensave'), ees); return; }
+    var epg = e.target.closest('[data-enpage]');
+    if (epg) {
+      enrich.offset = Math.max(0, enrich.offset + (epg.getAttribute('data-enpage') === 'next' ? enrich.limit : -enrich.limit));
+      load(); return;
+    }
+    if (e.target.closest('#en-go')) {
+      var qb = $('en-q'), cb = $('en-city'), mb = $('en-missing');
+      enrich.q = qb ? qb.value.trim() : '';
+      enrich.city = cb ? cb.value : '';
+      enrich.missing = mb ? mb.value : '';
+      enrich.offset = 0; load(); return;
+    }
     var page = e.target.closest('[data-page]');
     if (page) {
       unpinned.offset = Math.max(0, unpinned.offset + (page.getAttribute('data-page') === 'next' ? unpinned.limit : -unpinned.limit));
@@ -1020,6 +1226,20 @@ window.addEventListener('unhandledrejection', function (e) {
     if (opt) { optimize(opt.getAttribute('data-id'), opt.getAttribute('data-opt'), opt); return; }
     var act = e.target.closest('[data-act]');
     if (act) { moderate(act.getAttribute('data-id'), act.getAttribute('data-act'), act.closest('.row'), act); return; }
+  });
+  // A dropdown that needs a second click to take effect is a dropdown people
+  // think is broken.
+  document.addEventListener('change', function(e){
+    var t = e.target;
+    if (!t || (t.id !== 'en-missing' && t.id !== 'en-city')) return;
+    if (t.id === 'en-missing') { enrich.missing = t.value; enrich.city = ''; }
+    else { enrich.city = t.value; }
+    enrich.offset = 0; load();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key !== 'Enter') return;
+    if (e.target && e.target.id === 'en-q') { e.preventDefault(); enrich.q = e.target.value.trim(); enrich.offset = 0; load(); }
+    if (e.target && e.target.id === 'unp-q') { e.preventDefault(); unpinned.q = e.target.value.trim(); unpinned.offset = 0; load(); }
   });
   $('refresh').addEventListener('click', function(){ load(); });
   $('signin').addEventListener('click', signIn);
