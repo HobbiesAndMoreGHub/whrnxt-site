@@ -103,6 +103,12 @@ eleventyExcludeFromCollections: true
   .statgo:hover{border-color:#3a4658}
   .desc{margin:6px 0 0;color:var(--ink);font-size:13.5px;line-height:1.5;max-width:70ch}
   .alt{color:var(--muted);font-weight:400;font-size:.82em}
+  .pending{display:flex;gap:16px;align-items:center;flex-wrap:wrap;justify-content:space-between;
+    background:rgba(210,153,34,.10);border:1px solid rgba(210,153,34,.42);border-radius:12px;
+    padding:14px 16px;margin:0 0 18px}
+  .pending-body{min-width:0}
+  .pending-body strong{display:block;color:var(--ink);font-size:15px;margin-bottom:3px}
+  .pending-body span{display:block;color:var(--muted);font-size:13.5px;line-height:1.5}
   .enrich-filter select,.enrich-filter input{background:#0d1117;border:1px solid var(--line);color:var(--ink);
     border-radius:8px;padding:8px 10px;font:inherit;font-size:13px}
   .enrich-filter input{flex:1 1 180px;min-width:0}
@@ -696,6 +702,12 @@ window.addEventListener('unhandledrejection', function (e) {
           pubSay('Published. Netlify is deploying it now, which takes another minute or two. ' +
                  'If there was nothing to publish it will have committed nothing \u2014 ' + link + ' says which.', 'good');
           say('Published to the app.', 'good');
+          // The workflow stamps the watermark as its last step, so the counts
+          // only clear once that has actually run.
+          api('/api/admin/summary').then(function(sm){
+            summary = sm; updatePills();
+            if (section === 'overview') render();
+          }).catch(function(){});
         } else {
           pubSay('The publish run did not succeed (' + esc(run.conclusion || 'no conclusion') + '). Nothing was committed. See ' + link + '.', 'bad');
         }
@@ -785,6 +797,7 @@ window.addEventListener('unhandledrejection', function (e) {
         statLink((d.unpinned||0).toLocaleString(), 'still need a location', 'unpinned', (d.unpinned||0)>0) +
         statLink((d.no_picture||0).toLocaleString(), 'without a picture', 'enrich') +
       '</div>' +
+      pendingBanner(summary.pending) +
       '<div class="row"><h3>Email notifications</h3>' +
         '<p>An email when someone shares a trip or submits a place, so you are not checking this page to find out. ' +
         'Sent from the Workspace account behind support@whrnxt.net.</p>' +
@@ -807,6 +820,29 @@ window.addEventListener('unhandledrejection', function (e) {
           '</div></div>'
         : '<div class="empty">Nothing waiting. Both queues are clear.</div>');
   }
+  // Publishing is manual, so the gap between "saved" and "live" is real and
+  // nothing else on the page shows it. This says what is waiting and in what
+  // shape, because "3 changes" is a number and "2 locations and a description"
+  // is something you can recognise as your own afternoon.
+  function pendingBanner(p){
+    if (!p || !p.total) return '';
+    var bits = [];
+    if (p.locations) bits.push(p.locations + ' location' + (p.locations === 1 ? '' : 's') + ' pinned');
+    if (p.text) bits.push(p.text + ' description' + (p.text === 1 ? '' : 's') + ' edited');
+    if (p.removals) bits.push(p.removals + ' place' + (p.removals === 1 ? '' : 's') + ' removed');
+    var last = p.lastPublishedAt
+      ? 'Last published ' + esc(String(p.lastPublishedAt).slice(0, 10)) + '.'
+      : 'Nothing has been published from here yet.';
+    return '<div class="pending" id="pending-banner">' +
+      '<div class="pending-body">' +
+        '<strong>' + p.total + ' change' + (p.total === 1 ? '' : 's') + ' waiting to go into the app</strong>' +
+        '<span>' + esc(bits.join(', ')) + '. Saved here, but the app will not show ' +
+          (p.total === 1 ? 'it' : 'them') + ' until you publish. ' + last + '</span>' +
+      '</div>' +
+      '<button class="btn btn-signal" data-go-publish="1">Publish now</button>' +
+    '</div>';
+  }
+
   function stat(v, label, attn){
     return '<div class="stat' + (attn?' attn':'') + '"><b>' + esc(String(v)) + '</b><span>' + esc(label) + '</span></div>';
   }
@@ -1236,6 +1272,19 @@ window.addEventListener('unhandledrejection', function (e) {
   document.addEventListener('click', function(e){
     var nav = e.target.closest('.navb[data-sec]');
     if (nav) { section = nav.getAttribute('data-sec'); status = 'pending'; renderQueue.data = null; load(); return; }
+    var gp = e.target.closest('[data-go-publish]');
+    if (gp) {
+      var real = $('pub-go');
+      if (real) {
+        // Publish first. Scrolling is a courtesy, and a courtesy that throws
+        // must not take the action down with it — which is exactly what
+        // happened: scrollIntoView is not universal, and the exception aborted
+        // the click before it ever reached publish().
+        publish(real);
+        try { if (real.scrollIntoView) real.scrollIntoView({ block: 'center' }); } catch (err) {}
+      }
+      return;
+    }
     var mt = e.target.closest('#mail-go');
     if (mt) { mailTest(mt); return; }
     var pub = e.target.closest('#pub-go');
