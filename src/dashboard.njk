@@ -112,6 +112,13 @@ eleventyExcludeFromCollections: true
   .enrich-filter select,.enrich-filter input{background:#0d1117;border:1px solid var(--line);color:var(--ink);
     border-radius:8px;padding:8px 10px;font:inherit;font-size:13px}
   .enrich-filter input{flex:1 1 180px;min-width:0}
+  .howto{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:0 0 16px}
+  .howto summary{cursor:pointer;color:var(--ink);font-weight:600;font-size:14px}
+  .howto ol{margin:10px 0 0;padding-left:20px;color:var(--muted);font-size:13.5px;line-height:1.65}
+  .howto li{margin-bottom:7px}
+  .howto code,.pid{font-family:var(--mono);font-size:12px;background:#0d1117;border:1px solid var(--line);
+    border-radius:5px;padding:1px 5px;color:var(--ink)}
+  .howto a{color:var(--signal)}
   .bulk{display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:space-between;
     background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:0 0 16px}
   .bulk span{color:var(--muted);font-size:13.5px;line-height:1.5;flex:1 1 320px;min-width:0}
@@ -492,14 +499,38 @@ window.addEventListener('unhandledrejection', function (e) {
     return '';
   }
 
+  // Uploading is not something this page can do, and pretending otherwise would
+  // be worse than saying so. Images live in the app repo and are served from its
+  // origin; GitHub's own upload page takes a folder full at once, and the naming
+  // convention means the linking afterwards is a command rather than 500 forms.
+  function uploadStrip(){
+    var up = 'https://github.com/' + APP_REPO + '/upload/' + APP_BRANCH + '/img/places';
+    return '<details class="howto">' +
+      '<summary>Adding pictures in bulk</summary>' +
+      '<ol>' +
+        '<li>Name each file after the place it belongs to \u2014 <code>rome-a02.jpg</code> for the place <code>rome-a02</code>. ' +
+          'The id is shown under each name below. All 36,999 existing pictures follow this, and the linking step depends on it.</li>' +
+        '<li><a href="' + up + '" target="_blank" rel="noopener">Upload them to img/places on GitHub \u2197</a> \u2014 ' +
+          'drag a whole folder in, up to 100 files per commit. For more than a few hundred, copy them into ' +
+          '<code>Roming/img/places/</code> and push instead.</li>' +
+        '<li>Run <code>node tools/link_images.js --dry</code> to see what it found, then again with ' +
+          '<code>--credit "Photo: ... (CC BY-SA 4.0)"</code> to attach them. It only fills empty ones, never replaces ' +
+          'a picture that is already there, and it names any file matching no place.</li>' +
+        '<li>Press <strong>Publish now</strong>. The files reach the app when you push them; the paths reach it when you publish.</li>' +
+      '</ol>' +
+      '<p class="fine">The credit is not decoration: for the Wikimedia images already here it is the licence condition, ' +
+        'and stock photographs need a licence that covers this use.</p>' +
+    '</details>';
+  }
+
   function renderEnrich(){
     var b = $('body');
     if (busy) { b.innerHTML = enrichHead() + '<div class="empty">Loading\u2026</div>'; return; }
     if (!enrich.list.length) {
-      b.innerHTML = enrichHead() + '<div class="empty">Nothing matches that.</div>';
+      b.innerHTML = enrichHead() + uploadStrip() + '<div class="empty">Nothing matches that.</div>';
       return;
     }
-    b.innerHTML = enrichHead() + enrich.list.map(function(p){
+    b.innerHTML = enrichHead() + uploadStrip() + enrich.list.map(function(p){
       var img = p.image ? (/^https?:/.test(p.image) ? p.image : APP_ORIGIN.replace(/\/$/, '') + '/' + String(p.image).replace(/^\//, '')) : '';
       return '<div class="row en-row" data-eid="' + esc(p.id) + '">' +
         '<div class="en-grid">' +
@@ -514,6 +545,7 @@ window.addEventListener('unhandledrejection', function (e) {
               (p.picture_not_needed_at ? ' \u00b7 no picture needed' : '') +
               (p.text_edited_at ? ' \u00b7 edited ' + esc(String(p.text_edited_at).slice(0, 10)) : '') + '</span>' +
             '<h3>' + esc(p.name) + (p.local_name ? ' <span class="alt">' + esc(p.local_name) + '</span>' : '') + '</h3>' +
+            '<p class="meta"><code class="pid">' + esc(p.id) + '</code> \u2014 name its picture <code class="pid">' + esc(p.id) + '.jpg</code></p>' +
             '<p class="desc" data-endesc="' + esc(p.id) + '">' + esc(p.description || '(no description)') + '</p>' +
             (p.image_attribution ? '<p class="meta">' + esc(p.image_attribution) + '</p>' : '') +
             '<div class="acts">' +
