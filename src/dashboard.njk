@@ -112,6 +112,17 @@ eleventyExcludeFromCollections: true
   .enrich-filter select,.enrich-filter input{background:#0d1117;border:1px solid var(--line);color:var(--ink);
     border-radius:8px;padding:8px 10px;font:inherit;font-size:13px}
   .enrich-filter input{flex:1 1 180px;min-width:0}
+  .fastbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 0 14px}
+  .fastck{display:inline-flex;align-items:center;gap:7px;color:var(--muted);font-size:13.5px;
+    font-weight:600;cursor:pointer;user-select:none}
+  .fastck input{width:16px;height:16px;accent-color:var(--signal);cursor:pointer}
+  .fastck span{white-space:nowrap}
+  #en-credit{flex:1 1 300px;min-width:0;background:#0d1117;border:1px solid var(--line);
+    color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px}
+  .bulk-log{margin-top:12px;max-height:260px;overflow-y:auto;font-family:var(--mono);font-size:12px}
+  .bl{padding:3px 0;color:var(--muted);border-bottom:1px solid rgba(255,255,255,.04)}
+  .bl.ok{color:var(--ok)}
+  .bl.bad{color:var(--bad)}
   .pick{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}
   .howto{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:0 0 16px}
   .howto summary{cursor:pointer;color:var(--ink);font-weight:600;font-size:14px}
@@ -450,6 +461,29 @@ window.addEventListener('unhandledrejection', function (e) {
   var enrich = { list: [], total: 0, offset: 0, limit: 25, q: '', city: '', category: '',
                  missing: 'picture', cities: [], categories: [], listsFor: null };
 
+  // Fast mode. Doing this to one place is a few clicks; doing it to four hundred
+  // is the same few clicks four hundred times, and that is the whole difficulty.
+  // So: every editor already open, Remove where you can reach it, no
+  // confirmations, and one credit reused across the batch so an upload can save
+  // itself instead of waiting to be told to.
+  //
+  // Kept in localStorage because it is a way of working for an afternoon, not a
+  // setting for one page load.
+  var bulkDirty = false;
+  var FAST_KEY = 'whrnxt-admin-fastpics';
+  var CREDIT_KEY = 'whrnxt-admin-credit';
+  var fastPics = false, batchCredit = '';
+  try { fastPics = localStorage.getItem(FAST_KEY) === '1'; } catch (e) {}
+  try { batchCredit = localStorage.getItem(CREDIT_KEY) || ''; } catch (e) {}
+  function setFast(on){
+    fastPics = !!on;
+    try { localStorage.setItem(FAST_KEY, fastPics ? '1' : '0'); } catch (e) {}
+  }
+  function setCredit(v){
+    batchCredit = String(v || '');
+    try { localStorage.setItem(CREDIT_KEY, batchCredit); } catch (e) {}
+  }
+
   function enrichHead(){
     return '<div class="pin-filter enrich-filter">' +
       '<select id="en-missing">' +
@@ -476,7 +510,42 @@ window.addEventListener('unhandledrejection', function (e) {
       '<span class="fine">' + (enrich.total
         ? (enrich.offset + 1) + '\u2013' + Math.min(enrich.offset + enrich.limit, enrich.total) + ' of ' + enrich.total.toLocaleString()
         : '0') + '</span>' +
-    '</div>' + bulkBar();
+    '</div>' +
+    '<div class="fastbar">' +
+      '<label class="fastck"><input type="checkbox" id="en-fast"' + (fastPics ? ' checked' : '') + '> ' +
+        '<span>Fast image editing</span></label>' +
+      '<input id="en-credit" placeholder="Credit to use for everything uploaded here" ' +
+        'value="' + esc(batchCredit) + '" autocomplete="off"' + (fastPics ? '' : ' hidden') + '>' +
+      '<button class="btn" type="button" id="en-bulkpics">Upload a folder\u2026</button>' +
+    '</div>' +
+    (fastPics
+      ? '<p class="fine" style="margin:-8px 0 16px">Editors are open, Remove is one click and asks nothing. ' +
+        'With a credit set, choosing a file uploads and saves it in one go.</p>'
+      : '') +
+    bulkBar() + bulkUploadBox();
+  }
+
+  // Uploading a folder. Each file is named after its place, so the browser can
+  // do the whole job: upload it, take the address back, and attach it to the
+  // place whose id matches the filename. No git, no tool, no terminal.
+  function bulkUploadBox(){
+    return '<div class="rm-box" id="bulk-pics" hidden>' +
+      '<p style="margin:0 0 10px"><strong style="color:var(--ink)">Upload a folder of pictures</strong></p>' +
+      '<p class="fine" style="margin:0 0 10px">Each file has to be named after the place it belongs to \u2014 ' +
+        '<code class="pid">rome-a02.jpg</code> for <code class="pid">rome-a02</code>. The id is under every name below. ' +
+        'Files matching no place are reported and skipped, and a place that already has a picture is left alone ' +
+        'unless you tick replace.</p>' +
+      '<div class="rm-line">' +
+        '<input id="bulk-credit" placeholder="Credit for all of them" value="' + esc(batchCredit) + '" autocomplete="off">' +
+        '<label class="fastck"><input type="checkbox" id="bulk-replace"> <span>Replace existing pictures</span></label>' +
+      '</div>' +
+      '<div class="pick" style="margin-top:10px">' +
+        '<input type="file" id="bulk-files" accept="image/jpeg,image/png,image/webp,image/avif" multiple hidden>' +
+        '<button class="btn btn-signal" type="button" id="bulk-pick">Choose files\u2026</button>' +
+        '<button class="btn btn-ghost" type="button" id="bulk-close">Close</button>' +
+      '</div>' +
+      '<div id="bulk-log" class="bulk-log"></div>' +
+    '</div>';
   }
 
   // Marking 2,754 airports one at a time is not a thing anyone will do, so the
@@ -554,7 +623,8 @@ window.addEventListener('unhandledrejection', function (e) {
             (p.image_attribution ? '<p class="meta">' + esc(p.image_attribution) + '</p>' : '') +
             '<div class="acts">' +
               '<button class="btn btn-signal rec-btn" data-enedit="' + esc(p.id) + '">Edit text</button>' +
-              '<button class="btn rec-btn" data-picedit="' + esc(p.id) + '">' + (p.image ? 'Change picture' : 'Add picture') + '</button>' +
+              (fastPics ? '' : '<button class="btn rec-btn" data-picedit="' + esc(p.id) + '">' + (p.image ? 'Change picture' : 'Add picture') + '</button>') +
+              (fastPics && p.image ? '<button class="btn rm-go rec-btn" data-picclear="' + esc(p.id) + '">Remove picture</button>' : '') +
               '<button class="btn btn-ghost rec-btn" data-picneed="' + esc(p.id) + '" data-on="' + (p.picture_not_needed_at ? '0' : '1') + '">' +
                 (p.picture_not_needed_at ? 'Put back on the list' : 'No picture needed') + '</button>' +
               '<a class="btn rec-btn" href="' + gmaps((p.name||'') + ' ' + (p.city||'')) + '" target="_blank" rel="nofollow noopener noreferrer">Google Maps \u2197</a>' +
@@ -594,7 +664,7 @@ window.addEventListener('unhandledrejection', function (e) {
 
   function pictureBox(p){
     var id = esc(p.id);
-    return '<div class="rm-box" data-picbox="' + id + '" hidden>' +
+    return '<div class="rm-box" data-picbox="' + id + '"' + (fastPics ? '' : ' hidden') + '>' +
       '<label class="fine" for="pi-' + id + '">Picture \u2014 a file already in the app under img/places/, or a full https:// address</label>' +
       '<input id="pi-' + id + '" data-picsrc="' + id + '" maxlength="500" autocomplete="off" spellcheck="false" ' +
         'placeholder="img/places/' + esc(p.id) + '.jpg" value="' + esc(p.image || '') + '">' +
@@ -605,11 +675,11 @@ window.addEventListener('unhandledrejection', function (e) {
       '</div>' +
       '<label class="fine" for="pa-' + id + '" style="margin-top:8px;display:block">Credit</label>' +
       '<input id="pa-' + id + '" data-picattr="' + id + '" maxlength="300" autocomplete="off" ' +
-        'placeholder="Photo: Name (CC BY-SA 4.0) \u2014 Wikimedia Commons" value="' + esc(p.image_attribution || '') + '">' +
+        'placeholder="Photo: Name (CC BY-SA 4.0) \u2014 Wikimedia Commons" value="' + esc(p.image_attribution || batchCredit || '') + '">' +
       '<div class="acts" style="margin-top:10px">' +
         '<button class="btn btn-signal" data-picsave="' + id + '">Save picture</button>' +
-        (p.image ? '<button class="btn rm-go" data-picclear="' + id + '">Remove picture</button>' : '') +
-        '<button class="btn btn-ghost" data-piccancel="' + id + '">Cancel</button>' +
+        (p.image && !fastPics ? '<button class="btn rm-go" data-picclear="' + id + '">Remove picture</button>' : '') +
+        (fastPics ? '' : '<button class="btn btn-ghost" data-piccancel="' + id + '">Cancel</button>') +
       '</div>' +
       '<p class="fine" style="margin:10px 0 0">Nothing is uploaded here. The file has to be in the app repo already, ' +
         'or hosted somewhere over https. It reaches the app on the next publish.</p>' +
@@ -643,12 +713,113 @@ window.addEventListener('unhandledrejection', function (e) {
       if (label) label.textContent = 'Uploaded ' + (d.bytes / 1024).toFixed(0) + ' KB. Add the credit, then Save picture.';
       if (btn) btn.disabled = false;
       var a = document.querySelector(attr('data-picattr', id));
+      if (a && !a.value && batchCredit) a.value = batchCredit;
+      // In fast mode a credit is the only thing standing between an upload and a
+      // saved picture, so if one is already there, finish the job.
+      if (fastPics && a && a.value.trim()) {
+        var saveBtn = document.querySelector(attr('data-picsave', id));
+        if (saveBtn) { savePicture(id, saveBtn, false); return; }
+      }
       if (a && !a.value) a.focus();
     }).catch(function(e){
       if (btn) btn.disabled = false;
       if (label) label.textContent = 'Choose a file\u2026';
       if (out) { out.style.color = 'var(--bad)'; out.textContent = e.message; }
     });
+  }
+
+  // One file: upload it, then attach it to the place its name points at. The
+  // two existing endpoints already do both halves, so this is the loop between
+  // them rather than anything new.
+  function bulkOne(file, credit, replace, log){
+    var id = file.name.replace(/\.[^.]+$/, '');
+    var line = document.createElement('div');
+    line.className = 'bl';
+    line.textContent = file.name + ' \u2026';
+    log.appendChild(line);
+    nudgeIntoView(line);
+
+    return fetch('/api/upload-image', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + sess.gh, 'Content-Type': file.type },
+      body: file,
+    }).then(function(r){
+      return r.json().then(function(d){ if (!r.ok) throw new Error(d.message || ('upload failed (' + r.status + ')')); return d; });
+    }).then(function(up){
+      return api('/api/admin/places/' + encodeURIComponent(id) + '/picture', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ image: up.url, attribution: credit })
+      }).then(function(){
+        line.className = 'bl ok';
+        line.textContent = file.name + '  \u2192  attached to ' + id;
+        return 'ok';
+      });
+    }).catch(function(e){
+      line.className = 'bl bad';
+      // "not_found" here always means the same thing, and saying so beats
+      // repeating the API's word for it four hundred times.
+      var why = /not_found|404/.test(e.message) ? 'no place called ' + id : e.message;
+      line.textContent = file.name + '  \u2014  ' + why;
+      return 'fail';
+    });
+  }
+
+  function bulkUpload(files){
+    var log = $('bulk-log');
+    var credit = ($('bulk-credit') || {}).value || '';
+    var replace = ($('bulk-replace') || {}).checked;
+    var pick = $('bulk-pick');
+    if (!sess || !sess.gh) {
+      log.innerHTML = '<div class="bl bad">Uploading needs the GitHub sign-in rather than the admin token \u2014 the files are stored against this site, and it checks with GitHub who you are.</div>';
+      return;
+    }
+    if (!credit.trim()) {
+      log.innerHTML = '<div class="bl bad">Give a credit first. It is the licence condition on most of what is already here.</div>';
+      return;
+    }
+    setCredit(credit.trim());
+    log.innerHTML = '';
+    pick.disabled = true;
+    var list = Array.prototype.slice.call(files);
+    var known = {};
+    enrich.list.forEach(function(x){ known[String(x.id)] = x; });
+
+    var skipped = list.filter(function(f){
+      var id = f.name.replace(/\.[^.]+$/, '');
+      return !replace && known[id] && known[id].image;
+    });
+    var todo = list.filter(function(f){ return skipped.indexOf(f) === -1; });
+    if (skipped.length) {
+      var s0 = document.createElement('div');
+      s0.className = 'bl';
+      s0.textContent = skipped.length + ' skipped \u2014 those places already have a picture. Tick replace to overwrite them.';
+      log.appendChild(s0);
+    }
+
+    // One at a time on purpose. Forty parallel uploads of a few megabytes each
+    // is a good way to have a phone network drop half of them, and the log is
+    // only readable if it arrives in order.
+    var ok = 0, bad = 0, i = 0;
+    (function next(){
+      if (i >= todo.length) {
+        pick.disabled = false;
+        var done = document.createElement('div');
+        done.className = 'bl ' + (bad ? 'bad' : 'ok');
+        done.textContent = ok + ' attached' + (bad ? ', ' + bad + ' failed' : '') + '. Press Publish now to send them to the app.';
+        log.appendChild(done);
+        // Deliberately NOT reloading the list here. Redrawing the section throws
+        // away this log, which is the only record of which files failed and why
+        // — and it vanishes at exactly the moment it becomes worth reading.
+        // Closing the panel refreshes instead.
+        bulkDirty = ok > 0;
+        if (ok) say(ok + ' picture' + (ok === 1 ? '' : 's') + ' uploaded and attached. Close the panel to refresh the list.', 'good');
+        return;
+      }
+      bulkOne(todo[i++], credit.trim(), replace, log).then(function(r){
+        if (r === 'ok') ok++; else bad++;
+        next();
+      });
+    })();
   }
 
   function togglePic(id, on){
@@ -979,6 +1150,13 @@ window.addEventListener('unhandledrejection', function (e) {
   function gmaps(query, placeId){
     return 'https://www.google.com/maps/search/?api=1&hl=en&query=' + encodeURIComponent(query) +
       (placeId ? '&query_place_id=' + encodeURIComponent(placeId) : '');
+  }
+
+  // scrollIntoView is not universal, and an exception from a courtesy has
+  // already aborted one real action in this file. It gets a wrapper rather than
+  // a third chance.
+  function nudgeIntoView(el){
+    try { if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' }); } catch (e) {}
   }
 
   function attr(name, val){
@@ -1547,6 +1725,27 @@ window.addEventListener('unhandledrejection', function (e) {
     if (ees) { saveText(ees.getAttribute('data-ensave'), ees); return; }
     var ped = e.target.closest('[data-picedit]');
     if (ped) { togglePic(ped.getAttribute('data-picedit')); return; }
+    if (e.target.closest('#en-bulkpics')) {
+      var box = $('bulk-pics');
+      if (box) {
+        box.hidden = !box.hidden;
+        if (!box.hidden) {
+          // Carry across whatever credit is in the bar, so it does not have to be
+          // typed a second time three inches lower.
+          var bc = $('bulk-credit'), ec = $('en-credit');
+          if (bc && ec && ec.value.trim() && !bc.value.trim()) bc.value = ec.value;
+          nudgeIntoView(box);
+        }
+      }
+      return;
+    }
+    if (e.target.closest('#bulk-close')) {
+      var bx = $('bulk-pics');
+      if (bx) bx.hidden = true;
+      if (bulkDirty) { bulkDirty = false; load(); }   // now the log has been read
+      return;
+    }
+    if (e.target.closest('#bulk-pick')) { var bf = $('bulk-files'); if (bf) bf.click(); return; }
     var ppk = e.target.closest('[data-picpick]');
     if (ppk) {
       var f = document.querySelector(attr('data-picfile', ppk.getAttribute('data-picpick')));
@@ -1597,6 +1796,17 @@ window.addEventListener('unhandledrejection', function (e) {
   // think is broken.
   document.addEventListener('change', function(e){
     var t = e.target;
+    if (t && t.id === 'en-fast') {
+      setFast(t.checked);
+      renderEnrich();
+      return;
+    }
+    if (t && (t.id === 'en-credit' || t.id === 'bulk-credit')) { setCredit(t.value); return; }
+    if (t && t.id === 'bulk-files' && t.files && t.files.length) {
+      bulkUpload(t.files);
+      t.value = '';
+      return;
+    }
     if (t && t.hasAttribute && t.hasAttribute('data-picfile') && t.files && t.files[0]) {
       var pid = t.getAttribute('data-picfile');
       uploadFile(pid, t.files[0], document.querySelector(attr('data-picpick', pid)));
