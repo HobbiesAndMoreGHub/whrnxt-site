@@ -586,8 +586,8 @@ window.addEventListener('unhandledrejection', function (e) {
   //
   // Pinning and removing write to Postgres. The app does not read Postgres: it
   // serves database.js, built from data/*.js and committed to the app repo for
-  // Netlify to publish. A workflow does that every six hours so nothing is ever
-  // forgotten; this button is for when you would rather not wait.
+  // Netlify to publish. This button is the only thing that does it: there is no
+  // schedule behind it, so an edit stays in the database until it is pressed.
   //
   // It dispatches the workflow with the admin's own GitHub token, which the
   // OAuth app already grants repo scope. Nothing new is stored and no token
@@ -793,7 +793,7 @@ window.addEventListener('unhandledrejection', function (e) {
       '</div>' +
       '<div class="row"><h3>Publish to the app</h3>' +
         '<p>Locations you pin and places you remove are saved straight away, but they live in the database until the app is rebuilt from it. ' +
-        'That happens on its own every six hours. This does it now.</p>' +
+        'This is what carries them across — nothing else does, so an edit waits here until you press it.</p>' +
         '<div class="acts"><button class="btn btn-signal" id="pub-go">Publish now</button>' +
         '<a class="btn" href="https://github.com/' + APP_REPO + '/actions/workflows/' + PUBLISH_WF + '" target="_blank" rel="noopener">History \u2197</a></div>' +
         '<p class="meta" id="pub-out"></p>' +
