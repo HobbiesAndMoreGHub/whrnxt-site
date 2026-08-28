@@ -33,10 +33,24 @@ async function whoIsThis(token) {
 }
 
 export default async (req) => {
-  if (req.method !== 'POST') return new Response('POST only', { status: 405 });
-
   const allow = String(process.env.ADMIN_GITHUB_USERS || '')
     .split(/[,\s]+/).filter(Boolean).map(s => s.toLowerCase());
+
+  // A GET says whether this is set up, and nothing else. "Is the variable live
+  // yet" is the question every deploy raises, and answering it should not need a
+  // token, a file, or curl. The number of allowed accounts is not a secret; the
+  // names are not returned.
+  if (req.method === 'GET') {
+    return Response.json({
+      ok: true,
+      configured: allow.length > 0,
+      accounts: allow.length,
+      message: allow.length
+        ? 'Ready. ' + allow.length + ' account(s) may upload. POST a file here to do it.'
+        : 'ADMIN_GITHUB_USERS is not set on this site, so nobody may upload. Add it, then redeploy — Netlify does not pick up a new variable until the site rebuilds.',
+    });
+  }
+  if (req.method !== 'POST') return new Response('POST or GET only', { status: 405 });
   if (!allow.length) {
     return Response.json({ error: 'not_configured',
       message: 'ADMIN_GITHUB_USERS is not set on this site, so nobody is allowed to upload.' }, { status: 503 });
