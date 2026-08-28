@@ -112,6 +112,11 @@ eleventyExcludeFromCollections: true
   .enrich-filter select,.enrich-filter input{background:#0d1117;border:1px solid var(--line);color:var(--ink);
     border-radius:8px;padding:8px 10px;font:inherit;font-size:13px}
   .enrich-filter input{flex:1 1 180px;min-width:0}
+  .bulk{display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:space-between;
+    background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:0 0 16px}
+  .bulk span{color:var(--muted);font-size:13.5px;line-height:1.5;flex:1 1 320px;min-width:0}
+  .rm-box input{width:100%;background:#0d1117;border:1px solid var(--line);color:var(--ink);
+    border-radius:8px;padding:8px 10px;font:inherit;font-size:13.5px}
   .en-grid{display:grid;grid-template-columns:132px 1fr;gap:16px;align-items:start}
   .en-shot img{width:132px;height:96px;object-fit:cover;border-radius:8px;display:block;background:#0d1117}
   .en-nopic{width:132px;height:96px;border:1px dashed var(--line);border-radius:8px;display:flex;
@@ -426,13 +431,16 @@ window.addEventListener('unhandledrejection', function (e) {
   // the thumbnail has to be resolved against the app.
   var APP_ORIGIN = {{ site.appUrl | dump | safe }};
   var MISSING = [
-    ['picture',     'No picture'],
+    ['picture',     'Needs a picture'],
+    ['has_picture', 'Has a picture'],
+    ['not_needed',  'Picture not needed'],
     ['thin',        'Thin description'],
     ['description', 'No description at all'],
-    ['edited',      'Edited here'],
+    ['edited',      'Text edited here'],
     ['',            'Everything']
   ];
-  var enrich = { list: [], total: 0, offset: 0, limit: 25, q: '', city: '', missing: 'picture', cities: [], citiesFor: null };
+  var enrich = { list: [], total: 0, offset: 0, limit: 25, q: '', city: '', category: '',
+                 missing: 'picture', cities: [], categories: [], listsFor: null };
 
   function enrichHead(){
     return '<div class="pin-filter enrich-filter">' +
@@ -448,12 +456,40 @@ window.addEventListener('unhandledrejection', function (e) {
             esc(c.city) + ' (' + c.n + ')</option>';
         }).join('') +
       '</select>' +
+      '<select id="en-cat">' +
+        '<option value="">Every type</option>' +
+        enrich.categories.map(function(c){
+          return '<option value="' + esc(c.category) + '"' + (c.category === enrich.category ? ' selected' : '') + '>' +
+            esc(c.category) + ' (' + c.n + ')</option>';
+        }).join('') +
+      '</select>' +
       '<input id="en-q" placeholder="Name contains..." value="' + esc(enrich.q) + '" autocomplete="off">' +
       '<button class="btn" type="button" id="en-go">Filter</button>' +
       '<span class="fine">' + (enrich.total
         ? (enrich.offset + 1) + '\u2013' + Math.min(enrich.offset + enrich.limit, enrich.total) + ' of ' + enrich.total.toLocaleString()
         : '0') + '</span>' +
-    '</div>';
+    '</div>' + bulkBar();
+  }
+
+  // Marking 2,754 airports one at a time is not a thing anyone will do, so the
+  // whole filtered set can be marked at once. It says the number out loud first,
+  // and the server refuses if that number has moved since the screen was drawn.
+  function bulkBar(){
+    if (!enrich.total) return '';
+    if (enrich.missing === 'picture') {
+      return '<div class="bulk">' +
+        '<span>' + enrich.total.toLocaleString() + ' place' + (enrich.total === 1 ? '' : 's') +
+        ' match this filter and are waiting for a picture. If this is a type that does not want one \u2014 stations, airports \u2014 take them off the list.</span>' +
+        '<button class="btn" type="button" data-bulk="on">Mark all ' + enrich.total.toLocaleString() + ' as not needed</button>' +
+      '</div>';
+    }
+    if (enrich.missing === 'not_needed') {
+      return '<div class="bulk">' +
+        '<span>' + enrich.total.toLocaleString() + ' marked as not needing a picture.</span>' +
+        '<button class="btn" type="button" data-bulk="off">Put all ' + enrich.total.toLocaleString() + ' back on the list</button>' +
+      '</div>';
+    }
+    return '';
   }
 
   function renderEnrich(){
@@ -470,17 +506,21 @@ window.addEventListener('unhandledrejection', function (e) {
           '<div class="en-shot">' +
             (img
               ? '<img src="' + esc(img) + '" alt="" loading="lazy" referrerpolicy="no-referrer">'
-              : '<div class="en-nopic">no picture</div>') +
+              : '<div class="en-nopic">' + (p.picture_not_needed_at ? 'not needed' : 'no picture') + '</div>') +
           '</div>' +
           '<div class="en-body">' +
             '<span class="label">' + esc(p.city || '') + (p.category ? ' \u00b7 ' + esc(p.category) : '') +
               (p.major ? ' \u00b7 major' : '') +
+              (p.picture_not_needed_at ? ' \u00b7 no picture needed' : '') +
               (p.text_edited_at ? ' \u00b7 edited ' + esc(String(p.text_edited_at).slice(0, 10)) : '') + '</span>' +
             '<h3>' + esc(p.name) + (p.local_name ? ' <span class="alt">' + esc(p.local_name) + '</span>' : '') + '</h3>' +
             '<p class="desc" data-endesc="' + esc(p.id) + '">' + esc(p.description || '(no description)') + '</p>' +
             (p.image_attribution ? '<p class="meta">' + esc(p.image_attribution) + '</p>' : '') +
             '<div class="acts">' +
               '<button class="btn btn-signal rec-btn" data-enedit="' + esc(p.id) + '">Edit text</button>' +
+              '<button class="btn rec-btn" data-picedit="' + esc(p.id) + '">' + (p.image ? 'Change picture' : 'Add picture') + '</button>' +
+              '<button class="btn btn-ghost rec-btn" data-picneed="' + esc(p.id) + '" data-on="' + (p.picture_not_needed_at ? '0' : '1') + '">' +
+                (p.picture_not_needed_at ? 'Put back on the list' : 'No picture needed') + '</button>' +
               '<a class="btn rec-btn" href="' + gmaps((p.name||'') + ' ' + (p.city||'')) + '" target="_blank" rel="nofollow noopener noreferrer">Google Maps \u2197</a>' +
               (shutterstock(p.city, p.name)
                 ? '<a class="btn rec-btn" href="' + esc(shutterstock(p.city, p.name)) + '" target="_blank" rel="nofollow noopener noreferrer">Shutterstock \u2197</a>'
@@ -489,6 +529,7 @@ window.addEventListener('unhandledrejection', function (e) {
               (safeHref(p.wiki) ? '<a class="btn rec-btn" href="' + esc(safeHref(p.wiki)) + '" target="_blank" rel="nofollow noopener noreferrer">Wikipedia \u2197</a>' : '') +
             '</div>' +
             editBox(p) +
+            pictureBox(p) +
             '<p class="meta" data-enout="' + esc(p.id) + '"></p>' +
           '</div>' +
         '</div>' +
@@ -511,6 +552,102 @@ window.addEventListener('unhandledrejection', function (e) {
       '</div>' +
       '<p class="fine" style="margin:10px 0 0">Saved here, then carried into the app by the next publish.</p>' +
     '</div>';
+  }
+
+  function pictureBox(p){
+    var id = esc(p.id);
+    return '<div class="rm-box" data-picbox="' + id + '" hidden>' +
+      '<label class="fine" for="pi-' + id + '">Picture \u2014 a file already in the app under img/places/, or a full https:// address</label>' +
+      '<input id="pi-' + id + '" data-picsrc="' + id + '" maxlength="500" autocomplete="off" spellcheck="false" ' +
+        'placeholder="img/places/' + esc(p.id) + '.jpg" value="' + esc(p.image || '') + '">' +
+      '<label class="fine" for="pa-' + id + '" style="margin-top:8px;display:block">Credit</label>' +
+      '<input id="pa-' + id + '" data-picattr="' + id + '" maxlength="300" autocomplete="off" ' +
+        'placeholder="Photo: Name (CC BY-SA 4.0) \u2014 Wikimedia Commons" value="' + esc(p.image_attribution || '') + '">' +
+      '<div class="acts" style="margin-top:10px">' +
+        '<button class="btn btn-signal" data-picsave="' + id + '">Save picture</button>' +
+        (p.image ? '<button class="btn rm-go" data-picclear="' + id + '">Remove picture</button>' : '') +
+        '<button class="btn btn-ghost" data-piccancel="' + id + '">Cancel</button>' +
+      '</div>' +
+      '<p class="fine" style="margin:10px 0 0">Nothing is uploaded here. The file has to be in the app repo already, ' +
+        'or hosted somewhere over https. It reaches the app on the next publish.</p>' +
+    '</div>';
+  }
+
+  function togglePic(id, on){
+    var box = document.querySelector(attr('data-picbox', id));
+    if (!box) return;
+    box.hidden = (on === false) ? true : !box.hidden;
+    if (!box.hidden) { var i = box.querySelector('input'); if (i) i.focus(); }
+  }
+
+  // The row is patched in place rather than reloaded, for the same reason as the
+  // text editor: with "needs a picture" selected, a reload makes the row you just
+  // fixed disappear, which reads as having lost the change.
+  function afterPicture(id, place){
+    enrich.list.forEach(function(x){
+      if (String(x.id) !== String(id)) return;
+      if ('image' in place) { x.image = place.image; x.image_attribution = place.image_attribution; }
+      if ('picture_not_needed_at' in place) x.picture_not_needed_at = place.picture_not_needed_at;
+    });
+    renderEnrich();
+    api('/api/admin/summary').then(function(sm){ summary = sm; updatePills(); }).catch(function(){});
+  }
+
+  function savePicture(id, btn, clear){
+    var src = document.querySelector(attr('data-picsrc', id));
+    var attrEl = document.querySelector(attr('data-picattr', id));
+    var out = document.querySelector(attr('data-enout', id));
+    var was = btn.textContent;
+    btn.disabled = true; btn.textContent = clear ? 'Removing...' : 'Saving...';
+    if (out) { out.style.color = ''; out.textContent = ''; }
+    api('/api/admin/places/' + encodeURIComponent(id) + '/picture', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(clear ? { clear: true } : { image: src ? src.value : '', attribution: attrEl ? attrEl.value : '' })
+    }).then(function(r){
+      say(clear ? 'Picture removed. It leaves the app on the next publish.' : 'Picture saved. It reaches the app on the next publish.', 'good');
+      afterPicture(id, r.place || {});
+    }).catch(function(e){
+      btn.disabled = false; btn.textContent = was;
+      if (out) { out.style.color = 'var(--bad)'; out.textContent = e.message; }
+    });
+  }
+
+  function markNeeded(id, notNeeded, btn){
+    var out = document.querySelector(attr('data-enout', id));
+    btn.disabled = true; btn.textContent = 'Saving...';
+    api('/api/admin/places/' + encodeURIComponent(id) + '/picture', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ notNeeded: notNeeded })
+    }).then(function(r){
+      say(notNeeded ? 'Marked as not needing a picture. It comes off the list.' : 'Back on the list.', 'good');
+      afterPicture(id, r.place || {});
+    }).catch(function(e){
+      btn.disabled = false;
+      if (out) { out.style.color = 'var(--bad)'; out.textContent = e.message; }
+    });
+  }
+
+  function bulkMark(notNeeded, btn){
+    var n = enrich.total;
+    var what = notNeeded
+      ? 'Mark all ' + n.toLocaleString() + ' of these as not needing a picture?'
+      : 'Put all ' + n.toLocaleString() + ' of these back on the picture list?';
+    if (!window.confirm(what + '\n\nIt applies to everything matching the current filter, not just this page. It can be undone the same way.')) return;
+    var was = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Marking...';
+    api('/api/admin/places/bulk-picture', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      // The count travels with the request: the server refuses if the filter no
+      // longer matches it, so a stale screen cannot quietly mark the wrong set.
+      body: JSON.stringify({ notNeeded: notNeeded, expected: n,
+        missing: enrich.missing, city: enrich.city, category: enrich.category, q: enrich.q })
+    }).then(function(r){
+      say(r.changed.toLocaleString() + ' place' + (r.changed === 1 ? '' : 's') + ' updated.', 'good');
+      enrich.offset = 0; enrich.listsFor = null; load();
+    }).catch(function(e){
+      btn.disabled = false; btn.textContent = was;
+      say(e.message, 'bad');
+    });
   }
 
   function enrichPager(){
@@ -1157,16 +1294,22 @@ window.addEventListener('unhandledrejection', function (e) {
       busy = true; render(); say('Loading…');
       // The city list depends on the missing-filter, so it is refetched when
       // that changes and reused when it has not.
-      var needCities = enrich.citiesFor !== enrich.missing;
-      var cityReq = needCities
-        ? api('/api/admin/place-cities?missing=' + encodeURIComponent(enrich.missing))
-            .then(function(d){ enrich.cities = d.cities || []; enrich.citiesFor = enrich.missing; })
-            .catch(function(){ enrich.cities = []; })
+      // The option lists depend on the filter, so they are refetched when any
+      // part of it moves and reused when none of it has.
+      var key = [enrich.missing, enrich.city, enrich.category, enrich.q].join('\u0000');
+      var listReq = enrich.listsFor !== key
+        ? api('/api/admin/place-cities?missing=' + encodeURIComponent(enrich.missing) +
+              (enrich.city ? '&city=' + encodeURIComponent(enrich.city) : '') +
+              (enrich.category ? '&category=' + encodeURIComponent(enrich.category) : '') +
+              (enrich.q ? '&q=' + encodeURIComponent(enrich.q) : ''))
+            .then(function(d){ enrich.cities = d.cities || []; enrich.categories = d.categories || []; enrich.listsFor = key; })
+            .catch(function(){ enrich.cities = []; enrich.categories = []; })
         : Promise.resolve();
-      return cityReq.then(function(){
+      return listReq.then(function(){
         return api('/api/admin/places?limit=' + enrich.limit + '&offset=' + enrich.offset +
                    '&missing=' + encodeURIComponent(enrich.missing) +
                    (enrich.city ? '&city=' + encodeURIComponent(enrich.city) : '') +
+                   (enrich.category ? '&category=' + encodeURIComponent(enrich.category) : '') +
                    (enrich.q ? '&q=' + encodeURIComponent(enrich.q) : ''));
       }).then(function(d){
         busy = false;
@@ -1314,15 +1457,28 @@ window.addEventListener('unhandledrejection', function (e) {
     if (eec) { toggleEdit(eec.getAttribute('data-encancel'), false); return; }
     var ees = e.target.closest('[data-ensave]');
     if (ees) { saveText(ees.getAttribute('data-ensave'), ees); return; }
+    var ped = e.target.closest('[data-picedit]');
+    if (ped) { togglePic(ped.getAttribute('data-picedit')); return; }
+    var pcc = e.target.closest('[data-piccancel]');
+    if (pcc) { togglePic(pcc.getAttribute('data-piccancel'), false); return; }
+    var pss = e.target.closest('[data-picsave]');
+    if (pss) { savePicture(pss.getAttribute('data-picsave'), pss, false); return; }
+    var pcl = e.target.closest('[data-picclear]');
+    if (pcl) { savePicture(pcl.getAttribute('data-picclear'), pcl, true); return; }
+    var pnd = e.target.closest('[data-picneed]');
+    if (pnd) { markNeeded(pnd.getAttribute('data-picneed'), pnd.getAttribute('data-on') === '1', pnd); return; }
+    var blk = e.target.closest('[data-bulk]');
+    if (blk) { bulkMark(blk.getAttribute('data-bulk') === 'on', blk); return; }
     var epg = e.target.closest('[data-enpage]');
     if (epg) {
       enrich.offset = Math.max(0, enrich.offset + (epg.getAttribute('data-enpage') === 'next' ? enrich.limit : -enrich.limit));
       load(); return;
     }
     if (e.target.closest('#en-go')) {
-      var qb = $('en-q'), cb = $('en-city'), mb = $('en-missing');
+      var qb = $('en-q'), cb = $('en-city'), mb = $('en-missing'), tb = $('en-cat');
       enrich.q = qb ? qb.value.trim() : '';
       enrich.city = cb ? cb.value : '';
+      enrich.category = tb ? tb.value : '';
       enrich.missing = mb ? mb.value : '';
       enrich.offset = 0; load(); return;
     }
@@ -1347,8 +1503,11 @@ window.addEventListener('unhandledrejection', function (e) {
   // think is broken.
   document.addEventListener('change', function(e){
     var t = e.target;
-    if (!t || (t.id !== 'en-missing' && t.id !== 'en-city')) return;
-    if (t.id === 'en-missing') { enrich.missing = t.value; enrich.city = ''; }
+    if (!t || (t.id !== 'en-missing' && t.id !== 'en-city' && t.id !== 'en-cat')) return;
+    // Changing what you are looking for drops the narrower choices, because a
+    // city that had 400 rows under one filter may have none under the next.
+    if (t.id === 'en-missing') { enrich.missing = t.value; enrich.city = ''; enrich.category = ''; }
+    else if (t.id === 'en-cat') { enrich.category = t.value; }
     else { enrich.city = t.value; }
     enrich.offset = 0; load();
   });
