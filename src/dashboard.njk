@@ -198,6 +198,7 @@ eleventyExcludeFromCollections: true
     <div class="head">
       <h2 id="sec-title">Overview</h2>
       <button class="btn btn-ghost" id="refresh">Refresh</button>
+      <button class="btn btn-ghost" id="hardrefresh" title="Clear this browser's copy of the admin and load it again from scratch. You stay signed in.">Hard refresh</button>
     </div>
     <p class="sub" id="sec-sub"></p>
     <div id="tabs" class="tabs" hidden></div>
@@ -374,6 +375,10 @@ window.addEventListener('unhandledrejection', function (e) {
   function api(path, opts){
     opts = opts || {};
     opts.headers = headers(opts.headers);
+    // Belt and braces with the server's no-store header: this one also defeats
+    // a cache entry made before that header existed, which is exactly the state
+    // a browser that has been using this admin for a week is in.
+    if (!opts.cache) opts.cache = 'no-store';
     return fetch(API + path, opts).then(function(r){
       if (r.status === 401) {
         // Which credential failed changes what you have to go and fix.
@@ -1353,6 +1358,36 @@ window.addEventListener('unhandledrejection', function (e) {
     if (e.target && e.target.id === 'unp-q') { e.preventDefault(); unpinned.q = e.target.value.trim(); unpinned.offset = 0; load(); }
   });
   $('refresh').addEventListener('click', function(){ load(); });
+
+  // Refresh re-asks the API. This throws away the browser's copy of the page
+  // itself, which is the thing an ordinary reload will happily serve you again.
+  //
+  // It deliberately leaves sessionStorage alone: the session lives there, and a
+  // refresh button that signs you out is a refresh button nobody presses twice.
+  $('hardrefresh').addEventListener('click', function(){
+    var btn = this;
+    btn.disabled = true; btn.textContent = 'Clearing...';
+    var jobs = [];
+    // Nothing registers a service worker here today. It costs one line to make
+    // sure that stays true from this page's point of view.
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+      jobs.push(navigator.serviceWorker.getRegistrations()
+        .then(function(rs){ return Promise.all(rs.map(function(r){ return r.unregister(); })); })
+        .catch(function(){}));
+    }
+    if (window.caches && caches.keys) {
+      jobs.push(caches.keys()
+        .then(function(ks){ return Promise.all(ks.map(function(k){ return caches.delete(k); })); })
+        .catch(function(){}));
+    }
+    Promise.all(jobs).then(function(){
+      // A URL the caches have never seen. location.reload(true) has not forced
+      // anything for years — browsers ignore the argument — and an ordinary
+      // reload can still be answered from the edge, which is where the stale
+      // copy actually lives.
+      location.replace(location.pathname + '?fresh=' + Date.now());
+    });
+  });
   $('signin').addEventListener('click', signIn);
   $('tok-go').addEventListener('click', function(){
     var v = $('tok').value.trim();
