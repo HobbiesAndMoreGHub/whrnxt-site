@@ -554,6 +554,8 @@ window.addEventListener('unhandledrejection', function (e) {
               '<button class="btn btn-ghost rec-btn" data-picneed="' + esc(p.id) + '" data-on="' + (p.picture_not_needed_at ? '0' : '1') + '">' +
                 (p.picture_not_needed_at ? 'Put back on the list' : 'No picture needed') + '</button>' +
               '<a class="btn rec-btn" href="' + gmaps((p.name||'') + ' ' + (p.city||'')) + '" target="_blank" rel="nofollow noopener noreferrer">Google Maps \u2197</a>' +
+              '<a class="btn rec-btn" href="' + gweb((p.name||'') + ' ' + (p.city||'')) + '" target="_blank" rel="nofollow noopener noreferrer">Google \u2197</a>' +
+              '<a class="btn rec-btn" href="' + gimages((p.name||'') + ' ' + (p.city||'')) + '" target="_blank" rel="nofollow noopener noreferrer">Images \u2197</a>' +
               (shutterstock(p.city, p.name)
                 ? '<a class="btn rec-btn" href="' + esc(shutterstock(p.city, p.name)) + '" target="_blank" rel="nofollow noopener noreferrer">Shutterstock \u2197</a>'
                 : '') +
@@ -918,6 +920,16 @@ window.addEventListener('unhandledrejection', function (e) {
     // repeating it only makes the search worse.
     var q = (c && n.indexOf(c + '-') !== 0 && n !== c) ? c + '-' + n : n;
     return 'https://www.shutterstock.com/search/' + encodeURIComponent(q);
+  }
+
+  // The map answers "where is it". These answer "what is it" and "what does it
+  // look like", which is what you actually need open when you are writing a
+  // description or hunting a photograph.
+  function gweb(query){
+    return 'https://www.google.com/search?q=' + encodeURIComponent(query);
+  }
+  function gimages(query){
+    return 'https://www.google.com/search?tbm=isch&q=' + encodeURIComponent(query);
   }
 
   function gmaps(query, placeId){
