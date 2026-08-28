@@ -557,6 +557,31 @@ window.addEventListener('unhandledrejection', function (e) {
     });
   }
 
+  // The endpoint needs an auth header, so it cannot be tested by opening its URL
+  // in a browser — that only ever returns 401. This is the way to reach it.
+  function mailTest(btn){
+    var out = $('mail-out');
+    var was = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Sending...';
+    if (out) { out.style.color = ''; out.textContent = 'Connecting to the mail server...'; }
+    api('/api/admin/mail-test').then(function(d){
+      btn.disabled = false; btn.textContent = was;
+      if (!out) return;
+      if (d.configured === false) {
+        out.style.color = 'var(--warn)';
+        var missing = Object.keys(d.have || {}).filter(function(k){ return !d.have[k]; });
+        out.textContent = d.message + (missing.length ? ' Missing: ' + missing.join(', ') + '.' : '');
+        return;
+      }
+      out.style.color = 'var(--ok)';
+      out.textContent = 'Sent to ' + (d.to || 'the notification address') + '. If it does not arrive within a minute, check the spam folder.';
+      say('Test email sent.', 'good');
+    }).catch(function(e){
+      btn.disabled = false; btn.textContent = was;
+      if (out) { out.style.color = 'var(--bad)'; out.textContent = e.message; }
+    });
+  }
+
   // ── publishing ────────────────────────────────────────────────────────────
   //
   // Pinning and removing write to Postgres. The app does not read Postgres: it
@@ -759,6 +784,12 @@ window.addEventListener('unhandledrejection', function (e) {
         stat((d.confirmed||0).toLocaleString(), 'location confirmed') +
         statLink((d.unpinned||0).toLocaleString(), 'still need a location', 'unpinned', (d.unpinned||0)>0) +
         statLink((d.no_picture||0).toLocaleString(), 'without a picture', 'enrich') +
+      '</div>' +
+      '<div class="row"><h3>Email notifications</h3>' +
+        '<p>An email when someone shares a trip or submits a place, so you are not checking this page to find out. ' +
+        'Sent from the Workspace account behind support@whrnxt.net.</p>' +
+        '<div class="acts"><button class="btn" id="mail-go">Send a test email</button></div>' +
+        '<p class="meta" id="mail-out"></p>' +
       '</div>' +
       '<div class="row"><h3>Publish to the app</h3>' +
         '<p>Locations you pin and places you remove are saved straight away, but they live in the database until the app is rebuilt from it. ' +
@@ -1205,6 +1236,8 @@ window.addEventListener('unhandledrejection', function (e) {
   document.addEventListener('click', function(e){
     var nav = e.target.closest('.navb[data-sec]');
     if (nav) { section = nav.getAttribute('data-sec'); status = 'pending'; renderQueue.data = null; load(); return; }
+    var mt = e.target.closest('#mail-go');
+    if (mt) { mailTest(mt); return; }
     var pub = e.target.closest('#pub-go');
     if (pub) { publish(pub); return; }
     var go = e.target.closest('[data-go]');
