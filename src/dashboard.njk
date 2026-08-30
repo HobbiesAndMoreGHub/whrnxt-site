@@ -112,6 +112,22 @@ eleventyExcludeFromCollections: true
   .enrich-filter select,.enrich-filter input{background:#0d1117;border:1px solid var(--line);color:var(--ink);
     border-radius:8px;padding:8px 10px;font:inherit;font-size:13px}
   .enrich-filter input{flex:1 1 180px;min-width:0}
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel-2)}
+  .ctab{width:100%;border-collapse:collapse;font-size:13.5px}
+  .ctab th{position:sticky;top:0;background:#141a24;color:var(--muted);font-weight:600;text-align:right;
+    padding:10px 14px;white-space:nowrap;cursor:pointer;user-select:none;border-bottom:1px solid var(--line)}
+  .ctab th.l{text-align:left}
+  .ctab th:hover{color:var(--ink)}
+  .ctab th.on{color:var(--signal)}
+  .ctab td{padding:8px 14px;text-align:right;border-bottom:1px solid rgba(255,255,255,.04);
+    font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+  .ctab td.l{text-align:left;font-family:var(--body);font-size:13.5px;color:var(--ink)}
+  .ctab tr.thin td{background:rgba(210,153,34,.07)}
+  .ctab tr.thin td.l{color:var(--warn)}
+  .ctab tbody tr:hover td{background:rgba(255,255,255,.03)}
+  .linkish{background:none;border:0;padding:0;color:var(--signal);font:inherit;cursor:pointer;text-decoration:underline}
+  #cty-q{flex:1 1 220px;min-width:0;background:#0d1117;border:1px solid var(--line);color:var(--ink);
+    border-radius:8px;padding:8px 10px;font:inherit;font-size:13px}
   .fastbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 0 14px}
   .fastck{display:inline-flex;align-items:center;gap:7px;color:var(--muted);font-size:13.5px;
     font-weight:600;cursor:pointer;user-select:none}
@@ -209,6 +225,7 @@ eleventyExcludeFromCollections: true
     <button class="navb" data-sec="places">Place submissions <span class="pill" id="pill-places" hidden></span></button>
     <a class="navb" href="/admin/cms/">Articles &#8599;</a>
     <button class="navb" data-sec="unpinned">Unverified locations <span class="pill" id="pill-unpinned" hidden></span></button>
+    <button class="navb" data-sec="cities">Cities</button>
     <button class="navb" data-sec="enrich">Pictures &amp; text <span class="pill" id="pill-enrich" hidden></span></button>
     <button class="navb" data-sec="removed">Removed places</button>
     <button class="navb" data-sec="users">Users</button>
@@ -384,6 +401,7 @@ window.addEventListener('unhandledrejection', function (e) {
     trips:    { title:'Shared trips',       sub:'Links people submitted. Approving one puts it on /trips/.' },
     places:   { title:'Place submissions',  sub:'From /add-place/. Approving marks it ready for tools/promote_submissions.js, which resolves the real location and writes it into the data files.' },
     unpinned: { title:'Unverified locations', sub:'Places with no Google establishment id, so nothing has confirmed where they are. Pin one and it leaves this list for good \u2014 whether Google matched it or you placed it yourself.' },
+    cities:   { title:'Cities',               sub:'What each city actually contains. A total does not say whether a city is thin \u2014 forty places can be thirty-five restaurants and a bus station. Sights is the column that matters; food fills up from imports and transit from the airport sweep.' },
     enrich:   { title:'Pictures & text',      sub:'What is thin or missing, and the words you can do something about. Filter down to a city first \u2014 38,000 places have no picture, and no list that long is a to-do list.' },
     removed:  { title:'Removed places',       sub:'Taken out of the database because there was nothing to pin \u2014 closed, moved, never there. Nothing is thrown away: the whole entry is kept here and can be put back. Run tools/sync_pg_to_data.js to carry a removal into the app.' },
     users:    { title:'Users',              sub:'Not built yet.' }
@@ -443,6 +461,66 @@ window.addEventListener('unhandledrejection', function (e) {
   // apostrophe. CSS.escape would do it and is not defined everywhere; escaping
   // the two characters that can close a quoted attribute value is enough, and it
   // depends on nothing.
+  // ── cities ────────────────────────────────────────────────────────────────
+  var cityRep = { rows: [], sort: 'sights', dir: 1, q: '', loaded: false };
+
+  function renderCities(){
+    var b = $('body');
+    if (busy && !cityRep.loaded) { b.innerHTML = '<div class="empty">Reading every city\u2026</div>'; return; }
+
+    var rows = cityRep.rows.slice();
+    if (cityRep.q) {
+      var q = cityRep.q.toLowerCase();
+      rows = rows.filter(function(r){ return (r.name || r.city).toLowerCase().indexOf(q) > -1; });
+    }
+    var key = cityRep.sort, dir = cityRep.dir;
+    rows.sort(function(a, bb){
+      if (key === 'name') return dir * String(a.name || a.city).localeCompare(String(bb.name || bb.city));
+      return dir * (a[key] - bb[key]) || String(a.name || a.city).localeCompare(String(bb.name || bb.city));
+    });
+
+    var tot = cityRep.rows.reduce(function(o, r){
+      o.total += r.total; o.sights += r.sights; o.food += r.food; o.transit += r.transit; return o;
+    }, { total:0, sights:0, food:0, transit:0 });
+    var thin = cityRep.rows.filter(function(r){ return r.sights < 8; }).length;
+
+    var head = function(k, label, hint){
+      var on = cityRep.sort === k;
+      return '<th class="' + (k === 'name' ? 'l' : '') + (on ? ' on' : '') + '" data-sort="' + k + '" title="' + esc(hint || '') + '">' +
+        esc(label) + (on ? (cityRep.dir === 1 ? ' \u2191' : ' \u2193') : '') + '</th>';
+    };
+
+    b.innerHTML =
+      '<div class="cards">' +
+        stat(cityRep.rows.length.toLocaleString(), 'cities') +
+        stat(tot.sights.toLocaleString(), 'sights') +
+        stat(tot.food.toLocaleString(), 'food & drink') +
+        stat(tot.transit.toLocaleString(), 'transit') +
+      '</div>' +
+      '<div class="pin-filter">' +
+        '<input id="cty-q" placeholder="Find a city" value="' + esc(cityRep.q) + '" autocomplete="off">' +
+        '<span class="fine">' + rows.length.toLocaleString() + ' shown \u00b7 ' +
+          '<button class="linkish" type="button" id="cty-thin">' + thin + ' with fewer than 8 sights</button></span>' +
+      '</div>' +
+      '<div class="tablewrap"><table class="ctab"><thead><tr>' +
+        head('name', 'City') +
+        head('sights', 'Sights', 'Everything somebody goes there for') +
+        head('food', 'Food', 'Restaurants, cafes, breweries, nightlife') +
+        head('transit', 'Transit', 'Airports, rail, metro, ferries, ports, trams') +
+        head('total', 'Total') +
+        head('no_picture', 'No pic') +
+        head('unpinned', 'No location') +
+      '</tr></thead><tbody>' +
+      rows.slice(0, 400).map(function(r){
+        return '<tr' + (r.sights < 8 ? ' class="thin"' : '') + '>' +
+          '<td class="l">' + esc(r.name || r.city) + '</td>' +
+          '<td>' + r.sights + '</td><td>' + r.food + '</td><td>' + r.transit + '</td>' +
+          '<td>' + r.total + '</td><td>' + r.no_picture + '</td><td>' + r.unpinned + '</td></tr>';
+      }).join('') +
+      '</tbody></table></div>' +
+      (rows.length > 400 ? '<p class="fine" style="margin-top:12px">Showing the first 400. Sort or search to narrow it.</p>' : '');
+  }
+
   // ── pictures & text ───────────────────────────────────────────────────────
   //
   // Images are stored as repo-relative paths (img/places/paris-014.jpg) because
@@ -1177,12 +1255,13 @@ window.addEventListener('unhandledrejection', function (e) {
       b.classList.toggle('on', b.getAttribute('data-sec') === section);
     });
     show($('tabs'), section === 'trips' || section === 'places');
-    if (section === 'unpinned' || section === 'removed' || section === 'enrich') show($('tabs'), false);
+    if (section === 'unpinned' || section === 'removed' || section === 'enrich' || section === 'cities') show($('tabs'), false);
     if (section === 'overview') return renderOverview();
     if (section === 'users')    return renderUsers();
     if (section === 'unpinned') return renderUnpinned();
     if (section === 'removed')  return renderRemoved();
     if (section === 'enrich')   return renderEnrich();
+    if (section === 'cities')   return renderCities();
     return renderQueue();
   }
 
@@ -1556,6 +1635,19 @@ window.addEventListener('unhandledrejection', function (e) {
           render(); say('');
         }).catch(function(e){ busy = false; fail(e); });
     }
+    if (section === 'cities') {
+      // Read once and sorted in the browser after that: it is 2,944 rows of
+      // seven numbers, which is nothing to hold, and re-asking the database
+      // every time a column heading is clicked would be absurd.
+      if (cityRep.loaded) { render(); say(''); return Promise.resolve(); }
+      busy = true; render(); say('Loading…');
+      return api('/api/admin/city-report').then(function(d){
+        busy = false;
+        cityRep.rows = d.cities || [];   // the API sends the display name with each row
+        cityRep.loaded = true;
+        render(); say('');
+      }).catch(function(e){ busy = false; fail(e); });
+    }
     if (section === 'enrich') {
       busy = true; render(); say('Loading…');
       // The city list depends on the missing-filter, so it is refetched when
@@ -1717,6 +1809,17 @@ window.addEventListener('unhandledrejection', function (e) {
     if (rmg) { removePlace(rmg.getAttribute('data-rmgo'), rmg); return; }
     var rst = e.target.closest('[data-restore]');
     if (rst) { restorePlace(rst.getAttribute('data-restore'), rst); return; }
+    var sortTh = e.target.closest('[data-sort]');
+    if (sortTh) {
+      var k = sortTh.getAttribute('data-sort');
+      // Same column flips the direction; a new column starts the way you would
+      // want it — names A to Z, numbers smallest first, because the question is
+      // always which city has the fewest.
+      if (cityRep.sort === k) cityRep.dir = -cityRep.dir;
+      else { cityRep.sort = k; cityRep.dir = 1; }
+      renderCities(); return;
+    }
+    if (e.target.closest('#cty-thin')) { cityRep.sort = 'sights'; cityRep.dir = 1; cityRep.q = ''; renderCities(); return; }
     var eed = e.target.closest('[data-enedit]');
     if (eed) { toggleEdit(eed.getAttribute('data-enedit')); return; }
     var eec = e.target.closest('[data-encancel]');
@@ -1823,6 +1926,7 @@ window.addEventListener('unhandledrejection', function (e) {
   document.addEventListener('keydown', function(e){
     if (e.key !== 'Enter') return;
     if (e.target && e.target.id === 'en-q') { e.preventDefault(); enrich.q = e.target.value.trim(); enrich.offset = 0; load(); }
+    if (e.target && e.target.id === 'cty-q') { e.preventDefault(); cityRep.q = e.target.value.trim(); renderCities(); }
     if (e.target && e.target.id === 'unp-q') { e.preventDefault(); unpinned.q = e.target.value.trim(); unpinned.offset = 0; load(); }
   });
   $('refresh').addEventListener('click', function(){ load(); });
