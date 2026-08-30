@@ -33,7 +33,8 @@ eleventyExcludeFromCollections: true
   .btn:hover{border-color:#3a4658}
   .btn-signal{background:var(--signal);color:var(--signal-ink)}
   .btn-ghost{background:transparent;border-color:var(--line);color:var(--muted)}
-  .btn:disabled{opacity:.5;cursor:default}
+  .btn:disabled{opacity:.45;cursor:not-allowed;filter:saturate(.35)}
+  .btn:disabled:hover{transform:none}
 
   /* sign-in */
   .gate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
@@ -1083,7 +1084,43 @@ window.addEventListener('unhandledrejection', function (e) {
     return fetch(url, opts);
   }
 
+  // There are two buttons that start a publish — the one in the card and the one
+  // in the banner — and publish() was only ever given one of them. Pressing the
+  // banner disabled the card's button further down the page while the banner's
+  // own stayed bright, so it read as nothing having happened. Which is why it
+  // got pressed twice.
+  //
+  // Nothing was double-published: publish() refuses to start while one is
+  // running. But "it did nothing" and "it is doing it" have to look different,
+  // and that is the whole job of this function.
+  function publishTriggers(){
+    var out = [];
+    var main = $('pub-go');
+    if (main) out.push(main);
+    Array.prototype.forEach.call(document.querySelectorAll('[data-go-publish]'), function(b){ out.push(b); });
+    return out;
+  }
+
+  function setPublishing(on, label){
+    publishTriggers().forEach(function(b){
+      b.disabled = !!on;
+      if (on) {
+        if (!b.getAttribute('data-was')) b.setAttribute('data-was', b.textContent);
+        b.textContent = label || 'Publishing\u2026';
+      } else {
+        var was = b.getAttribute('data-was');
+        if (was) { b.textContent = was; b.removeAttribute('data-was'); }
+      }
+    });
+  }
+
+  // Kept, not just shown. Finishing a publish refreshes the summary, which
+  // redraws the overview and empties this element — so the sentence naming the
+  // run and telling you Netlify is deploying vanished at exactly the moment it
+  // became worth reading. Same mistake as the bulk-upload log.
+  var lastPub = null;
   function pubSay(text, kind){
+    lastPub = text ? { text: text, kind: kind } : null;
     var el = $('pub-out');
     if (!el) return;
     el.innerHTML = text;
@@ -1099,8 +1136,8 @@ window.addEventListener('unhandledrejection', function (e) {
       return;
     }
     publishing = true;
-    btn.disabled = true; btn.textContent = 'Starting...';
-    pubSay('Asking GitHub to run the publish workflow...');
+    setPublishing(true, 'Starting\u2026');
+    pubSay('Asking GitHub to run the publish workflow. Watch the progress here \u2014 it takes two to five minutes, most of it rebuilding the app database.');
 
     // The newest run before we ask, so the one we are watching is ours and not
     // the last scheduled run sitting there looking finished.
@@ -1116,7 +1153,7 @@ window.addEventListener('unhandledrejection', function (e) {
       });
     }).catch(function(e){
       publishing = false;
-      btn.disabled = false; btn.textContent = 'Publish now';
+      setPublishing(false);
       pubSay(esc(e.message), 'bad');
     });
   }
@@ -1144,7 +1181,7 @@ window.addEventListener('unhandledrejection', function (e) {
   function watchRun(before, btn, tries){
     if (tries > 100) {                      // ~8 minutes
       publishing = false;
-      btn.disabled = false; btn.textContent = 'Publish now';
+      setPublishing(false);
       pubSay('Started, but it is taking longer than expected. <a href="https://github.com/' + APP_REPO + '/actions" target="_blank" rel="noopener">Watch it on GitHub</a>.');
       return;
     }
@@ -1155,18 +1192,18 @@ window.addEventListener('unhandledrejection', function (e) {
       return r.json().then(function(d){
         var run = d.workflow_runs && d.workflow_runs[0];
         if (!run || run.id === before) {
-          btn.textContent = 'Queued...';
+          setPublishing(true, 'Queued\u2026');
           pubSay('Waiting for GitHub to pick it up...');
           return watchRun(before, btn, tries + 1);
         }
         var link = '<a href="' + esc(run.html_url) + '" target="_blank" rel="noopener">the run</a>';
         if (run.status !== 'completed') {
-          btn.textContent = 'Publishing...';
+          setPublishing(true, 'Publishing\u2026');
           pubSay('Building the app database. This takes a couple of minutes \u2014 ' + link + '.');
           return watchRun(before, btn, tries + 1);
         }
         publishing = false;
-        btn.disabled = false; btn.textContent = 'Publish now';
+        setPublishing(false);
         if (run.conclusion === 'success') {
           pubSay('Published. Netlify is deploying it now, which takes another minute or two. ' +
                  'If there was nothing to publish it will have committed nothing \u2014 ' + link + ' says which.', 'good');
@@ -1294,9 +1331,12 @@ window.addEventListener('unhandledrejection', function (e) {
       '<div class="row"><h3>Publish to the app</h3>' +
         '<p>Locations you pin and places you remove are saved straight away, but they live in the database until the app is rebuilt from it. ' +
         'This is what carries them across — nothing else does, so an edit waits here until you press it.</p>' +
-        '<div class="acts"><button class="btn btn-signal" id="pub-go">Publish now</button>' +
+        '<div class="acts"><button class="btn btn-signal" id="pub-go"' + (publishing ? ' disabled' : '') + '>' +
+          (publishing ? 'Publishing\u2026' : 'Publish now') + '</button>' +
         '<a class="btn" href="https://github.com/' + APP_REPO + '/actions/workflows/' + PUBLISH_WF + '" target="_blank" rel="noopener">History \u2197</a></div>' +
-        '<p class="meta" id="pub-out"></p>' +
+        '<p class="meta" id="pub-out"' +
+          (lastPub ? ' style="color:' + (lastPub.kind === 'bad' ? 'var(--bad)' : lastPub.kind === 'good' ? 'var(--ok)' : 'inherit') + '"' : '') +
+          '>' + (lastPub ? lastPub.text : '') + '</p>' +
       '</div>' +
       (waiting
         ? '<div class="row"><h3>' + waiting + ' item' + (waiting===1?'':'s') + ' waiting for you</h3>' +
@@ -1326,7 +1366,8 @@ window.addEventListener('unhandledrejection', function (e) {
         '<span>' + esc(bits.join(', ')) + '. Saved here, but the app will not show ' +
           (p.total === 1 ? 'it' : 'them') + ' until you publish. ' + last + '</span>' +
       '</div>' +
-      '<button class="btn btn-signal" data-go-publish="1">Publish now</button>' +
+      '<button class="btn btn-signal" data-go-publish="1"' + (publishing ? ' disabled' : '') + '>' +
+        (publishing ? 'Publishing\u2026' : 'Publish now') + '</button>' +
     '</div>';
   }
 
