@@ -17,7 +17,11 @@ body{
 .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
 a{color:inherit;text-decoration:none}
 .mono{font-family:var(--mono)}
-.label{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+/* Section labels — COMMUNITY, Find a city, the city on a trip card. They were
+   grey, which read as a caption for the thing above rather than a heading for
+   the thing below. */
+.label{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink);font-weight:700}
 /* Headings are white and links are yellow, everywhere. They were both grey in
    places, which left a page where nothing said "this is the title" and nothing
    said "this can be clicked". */
@@ -163,6 +167,8 @@ input::placeholder,textarea::placeholder{color:#5c6675}
 .trip-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px;display:block;transition:border-color .15s, transform .15s}
 .trip-card:hover{border-color:#33405a;transform:translateY(-2px)}
 .trip-card .label{display:block;margin-bottom:14px}
+.trip-foot{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.trip-km{font-size:12px;color:var(--muted);white-space:nowrap}
 .trip-card h3{font-family:var(--display);font-weight:800;font-size:21px;letter-spacing:0}
 .trip-card p{color:#b3bccb;margin:10px 0 16px;font-size:15.5px}
 .trip-open{color:var(--signal);font-size:12.5px;letter-spacing:.06em}

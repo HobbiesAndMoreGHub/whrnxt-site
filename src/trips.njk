@@ -49,7 +49,7 @@ permalink: /trips/index.html
   var heading = document.getElementById('trip-heading');
 
   var RECENT = 10;
-  var trips = [], cities = [], items = [], idx = -1, chosen = '';
+  var trips = [], cities = [], items = [], idx = -1, chosen = '', total = 0;
 
   // Group under the first city. Older submissions used commas and cannot be
   // split safely, so those are taken whole rather than guessed at.
@@ -76,10 +76,21 @@ permalink: /trips/index.html
       p.textContent = t.note;
       a.appendChild(p);
     }
+    var foot = document.createElement('span');
+    foot.className = 'trip-foot';
     var open = document.createElement('span');
     open.className = 'trip-open mono';
     open.textContent = 'Open in the app ▸';
-    a.appendChild(open);
+    foot.appendChild(open);
+    // How far it walks, which is the thing you want to know before opening it.
+    if (typeof t.distance_m === 'number') {
+      var km = t.distance_m / 1000;
+      var d = document.createElement('span');
+      d.className = 'trip-km mono';
+      d.textContent = (km < 10 ? km.toFixed(1) : Math.round(km)) + ' km';
+      foot.appendChild(d);
+    }
+    a.appendChild(foot);
     return a;
   }
 
@@ -96,8 +107,10 @@ permalink: /trips/index.html
     // single city they would be answering a question nobody asked.
     var tail = document.createElement('span');
     tail.className = 'trip-heading-tail';
+    // The server's count, not the length of what it sent. The page used to be
+    // handed 200 trips and announce "200 shared trips" however many there were.
     tail.appendChild(document.createTextNode(
-      ', ' + trips.length.toLocaleString() + ' shared trip' + (trips.length === 1 ? '' : 's') + ' total. '));
+      ', ' + total.toLocaleString() + ' shared trip' + (total === 1 ? '' : 's') + ' total. '));
     var a = document.createElement('a');
     a.href = '/#share';
     a.textContent = 'Submit yours here';
@@ -133,8 +146,19 @@ permalink: /trips/index.html
     input.value = name;
     clear.hidden = false;
     closeSuggest();
-    var mine = trips.filter(function(t){ return cityOf(t) === name; });
-    show(mine, mine.length + ' trip' + (mine.length === 1 ? '' : 's') + ' in ' + name);
+    // Fetched rather than filtered. The page holds two dozen recent trips, not
+    // ten thousand, so a city's own trips have to be asked for.
+    show([], 'Loading ' + name + '…');
+    fetch(API + '/api/trips?city=' + encodeURIComponent(name))
+      .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function(d){
+        if (chosen !== name) return;               // somebody picked again meanwhile
+        var mine = (d && d.trips) || [];
+        show(mine, mine.length + ' trip' + (mine.length === 1 ? '' : 's') + ' in ' + name);
+      })
+      .catch(function(){
+        if (chosen === name) show([], 'Could not load ' + name + ' just now.');
+      });
   }
 
   function reset(){
@@ -214,18 +238,14 @@ permalink: /trips/index.html
     .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
     .then(function(d){
       trips = (d && d.trips) || [];
+      total = (d && typeof d.total === 'number') ? d.total : trips.length;
+      // Every city with a trip behind it, counted by the database rather than by
+      // whatever happened to be in the recent handful.
+      cities = ((d && d.cities) || []).slice().sort(function(a, b){
+        return a.name.localeCompare(b.name);
+      });
       loading.remove();
       if (!trips.length) { empty.hidden = false; return; }
-
-      var counts = {};
-      trips.forEach(function(t){ var c = cityOf(t); counts[c] = (counts[c] || 0) + 1; });
-      cities = Object.keys(counts).map(function(name){ return { name: name, n: counts[name] }; })
-        .sort(function(a, b){
-          if (a.name === 'Elsewhere') return 1;
-          if (b.name === 'Elsewhere') return -1;
-          return a.name.localeCompare(b.name);
-        });
-
       if (cities.length > 1) find.hidden = false;
       newest();
     })
