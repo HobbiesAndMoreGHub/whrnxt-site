@@ -1586,21 +1586,34 @@ window.addEventListener('unhandledrejection', function (e) {
   // alternative to a button is an UPDATE typed against production. It appears
   // only when there is enough to be worth it — below five, clicking them is
   // faster than reading a warning about clicking them.
+  // The number that matters is the queue's true size, not how many rows came
+  // back. The list is capped at 500, so a 528-trip queue displayed 500 and then
+  // asked the server to change 500 — which it refused, correctly, because 528
+  // is not 500. Counting what is on screen is the wrong count for an action
+  // that applies to everything behind it.
+  function queueTotal(){
+    var d = renderQueue.data || {};
+    var rows = (d[QUEUES[section].list] || []).length;
+    return typeof d.total === 'number' ? d.total : rows;
+  }
+
   function queueBulkBar(list){
     if (section !== 'trips' || status !== 'pending' || list.length < 5) return '';
+    var total = queueTotal();
+    var capped = total > list.length;
     return '<div class="bulk">' +
-      '<span><strong style="color:var(--ink)">' + list.length.toLocaleString() + ' trips waiting.</strong> ' +
+      '<span><strong style="color:var(--ink)">' + total.toLocaleString() + ' trips waiting.</strong> ' +
+      (capped ? 'Showing the newest ' + list.length.toLocaleString() + '; these buttons apply to all ' + total.toLocaleString() + '. ' : '') +
       'Approving puts every one of them on /trips/ straight away \u2014 so this is worth a look down the list first.</span>' +
       '<span style="flex:0 0 auto">' +
-        '<button class="btn btn-signal" type="button" data-allq="approved">Approve all ' + list.length.toLocaleString() + '</button> ' +
-        '<button class="btn btn-ghost" type="button" data-allq="rejected">Reject all</button>' +
+        '<button class="btn btn-signal" type="button" data-allq="approved">Approve all ' + total.toLocaleString() + '</button> ' +
+        '<button class="btn btn-ghost" type="button" data-allq="rejected">Reject all ' + total.toLocaleString() + '</button>' +
       '</span>' +
     '</div>';
   }
 
   function moderateAll(to, btn){
-    var list = (renderQueue.data || {})[QUEUES[section].list] || [];
-    var n = list.length;
+    var n = queueTotal();
     if (!n) return;
     var what = to === 'approved'
       ? 'Approve all ' + n.toLocaleString() + ' trips?\n\nEvery one goes live on /trips/ immediately.'
