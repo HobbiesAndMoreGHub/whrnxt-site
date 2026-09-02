@@ -1607,9 +1607,79 @@ window.addEventListener('unhandledrejection', function (e) {
       'Approving puts every one of them on /trips/ straight away \u2014 so this is worth a look down the list first.</span>' +
       '<span style="flex:0 0 auto">' +
         '<button class="btn btn-signal" type="button" data-allq="approved">Approve all ' + total.toLocaleString() + '</button> ' +
+        '<button class="btn" type="button" data-reorderall="1">Reorder all ' + total.toLocaleString() + '</button> ' +
         '<button class="btn btn-ghost" type="button" data-allq="rejected">Reject all ' + total.toLocaleString() + '</button>' +
       '</span>' +
+      '<p class="fine" style="flex:1 1 100%;margin:6px 0 0" id="reorder-out"></p>' +
     '</div>';
+  }
+
+  // Reordering everything, free routing only.
+  //
+  // Google's optimiser stays on the individual rows: it is a paid call per day,
+  // and 528 trips at several days each is a bill nobody asked for. The free one
+  // costs arithmetic, and it already refuses to make a trip longer — so running
+  // it over everything can only help or do nothing.
+  //
+  // In batches, because three database round trips per trip is several minutes
+  // in one request, which is long enough for a proxy to give up and leave you
+  // unable to say what was done. Batching also means the count on screen moves.
+  function reorderAll(btn){
+    var total = queueTotal();
+    if (!total) return;
+    if (!window.confirm('Reorder all ' + total.toLocaleString() + ' trips with the free optimiser?\n\n'
+      + 'Each day is only changed if the new order is genuinely shorter, so a trip that is already sensible is left alone. '
+      + 'Reordering republishes a trip under a new link.')) return;
+
+    var was = btn.textContent;
+    btn.disabled = true;
+    var out = $('reorder-out');
+    var tally = { changed: 0, already: 0, failed: 0, days: 0, km: 0 };
+    var problems = [];
+
+    function step(offset){
+      btn.textContent = 'Reordering ' + Math.min(offset + 40, total).toLocaleString() + ' of ' + total.toLocaleString() + '\u2026';
+      return api('/api/trips/optimize-all', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ status: 'pending', expected: total, offset: offset, limit: 40 })
+      }).then(function(d){
+        tally.changed += d.changed; tally.already += d.already; tally.failed += d.failed;
+        tally.days += d.daysChanged; tally.km += d.savedKm;
+        (d.problems || []).forEach(function(x){ if (problems.length < 10) problems.push(x); });
+        if (out) {
+          out.style.color = '';
+          out.textContent = d.nextOffset.toLocaleString() + ' of ' + total.toLocaleString() + ' done \u2014 '
+            + tally.changed + ' reordered, ' + tally.already + ' already sensible'
+            + (tally.failed ? ', ' + tally.failed + ' could not be read' : '')
+            + (tally.km ? ', ' + tally.km.toFixed(1) + ' km saved' : '');
+        }
+        if (!d.done) return step(d.nextOffset);
+        return d;
+      });
+    }
+
+    step(0).then(function(){
+      btn.disabled = false; btn.textContent = was;
+      var msg = tally.changed.toLocaleString() + ' trip' + (tally.changed === 1 ? '' : 's') + ' reordered across '
+        + tally.days.toLocaleString() + ' day' + (tally.days === 1 ? '' : 's')
+        + (tally.km ? ', ' + tally.km.toFixed(1) + ' km shorter in total' : '')
+        + '. ' + tally.already.toLocaleString() + ' were already sensible'
+        + (tally.failed ? ', ' + tally.failed + ' could not be read' : '') + '.';
+      if (out) { out.style.color = 'var(--ok)'; out.textContent = msg; }
+      if (problems.length && out) {
+        out.textContent += '  Problems: ' + problems.slice(0, 3).join('; ');
+      }
+      // Reload for the new links, then say it — load() ends with say('').
+      renderQueue.data = null;
+      Promise.resolve(load()).then(function(){
+        say(msg, 'good');
+        var again = $('reorder-out');
+        if (again) { again.style.color = 'var(--ok)'; again.textContent = msg; }
+      });
+    }).catch(function(e){
+      btn.disabled = false; btn.textContent = was;
+      if (out) { out.style.color = 'var(--bad)'; out.textContent = e.message; }
+    });
   }
 
   function moderateAll(to, btn){
@@ -1990,6 +2060,8 @@ window.addEventListener('unhandledrejection', function (e) {
     if (save) { saveCity(save.getAttribute('data-savecity'), save); return; }
     var opt = e.target.closest('[data-opt]');
     if (opt) { optimize(opt.getAttribute('data-id'), opt.getAttribute('data-opt'), opt); return; }
+    var reall = e.target.closest('[data-reorderall]');
+    if (reall) { reorderAll(reall); return; }
     var allq = e.target.closest('[data-allq]');
     if (allq) { moderateAll(allq.getAttribute('data-allq'), allq); return; }
     var act = e.target.closest('[data-act]');
