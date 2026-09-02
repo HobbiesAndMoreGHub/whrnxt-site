@@ -113,6 +113,9 @@ eleventyExcludeFromCollections: true
   .enrich-filter select,.enrich-filter input{background:#0d1117;border:1px solid var(--line);color:var(--ink);
     border-radius:8px;padding:8px 10px;font:inherit;font-size:13px}
   .enrich-filter input{flex:1 1 180px;min-width:0}
+  .tabsort{margin-left:auto;background:#0d1117;border:1px solid var(--line);color:var(--muted);
+    border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+  .tabsort:hover{color:var(--ink)}
   .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel-2)}
   .ctab{width:100%;border-collapse:collapse;font-size:13.5px}
   .ctab th{position:sticky;top:0;background:#141a24;color:var(--muted);font-weight:600;text-align:right;
@@ -410,6 +413,7 @@ window.addEventListener('unhandledrejection', function (e) {
 
   var section = 'overview';
   var status  = 'pending';
+  var tripSort = 'newest';
   var summary = null;
   var busy    = false;
 
@@ -1715,7 +1719,16 @@ window.addEventListener('unhandledrejection', function (e) {
     $('tabs').innerHTML = ['pending','approved','rejected'].map(function(s){
       return '<button class="tab' + (s===status?' on':'') + '" data-status="' + s + '">' +
         s.charAt(0).toUpperCase() + s.slice(1) + '</button>';
-    }).join('');
+    }).join('') + (section === 'trips'
+      // Sorted by the server, not here: the list is capped at 500 and sorting
+      // the page would only reorder the newest 500 while calling itself
+      // "longest first".
+      ? '<select id="trip-sort" class="tabsort">' +
+          [['newest','Newest first'],['longest','Longest walk first'],
+           ['shortest','Shortest walk first'],['city','By city']]
+            .map(function(o){ return '<option value="' + o[0] + '"' + (tripSort === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') +
+        '</select>'
+      : '');
     if (busy) { b.innerHTML = '<div class="empty">Loading…</div>'; return; }
     var items = (renderQueue.data || {})[q.list] || [];
     if (!items.length) {
@@ -1748,10 +1761,17 @@ window.addEventListener('unhandledrejection', function (e) {
           '<button class="btn rec-btn" data-savecity="' + esc(t.id) + '">Save</button>' +
         '</div>' +
       '</div>';
+    // Far enough that it cannot be a day's walking is worth saying in colour.
+    // Somewhere around 30 km a "2 days in a city" trip has stopped being one.
+    var km = (typeof t.distance_m === 'number') ? t.distance_m / 1000 : null;
+    var farColour = km == null ? '' : (km >= 60 ? 'var(--bad)' : km >= 30 ? 'var(--warn)' : 'var(--muted)');
+    var dist = km == null ? ''
+      : ' \u00b7 <span style="color:' + farColour + '">' + (km < 10 ? km.toFixed(1) : Math.round(km)) + ' km</span>';
+
     return '<div class="row" data-id="' + esc(t.id) + '">' +
       (t.cities
-        ? '<span class="label">' + esc(t.cities) + '</span>'
-        : '<span class="label" style="color:var(--warn)">no city</span>') +
+        ? '<span class="label">' + esc(t.cities) + dist + '</span>'
+        : '<span class="label" style="color:var(--warn)">no city' + dist + '</span>') +
       '<h3>' + esc(t.title) + '</h3>' +
       (t.note ? '<p>' + esc(t.note) + '</p>' : '') +
       '<p class="meta">' + (href
@@ -1852,7 +1872,8 @@ window.addEventListener('unhandledrejection', function (e) {
       }).catch(function(e){ busy = false; fail(e); });
     }
     busy = true; render(); say('Loading…');
-    return api(QUEUES[section].queue + '?status=' + encodeURIComponent(status)).then(function(d){
+    return api(QUEUES[section].queue + '?status=' + encodeURIComponent(status) +
+               (section === 'trips' ? '&sort=' + encodeURIComponent(tripSort) : '')).then(function(d){
       busy = false; renderQueue.data = d; render(); say('');
     }).catch(function(e){ busy = false; fail(e); });
   }
@@ -2071,6 +2092,12 @@ window.addEventListener('unhandledrejection', function (e) {
   // think is broken.
   document.addEventListener('change', function(e){
     var t = e.target;
+    if (t && t.id === 'trip-sort') {
+      tripSort = t.value;
+      renderQueue.data = null;
+      load();
+      return;
+    }
     if (t && t.id === 'en-fast') {
       setFast(t.checked);
       renderEnrich();
