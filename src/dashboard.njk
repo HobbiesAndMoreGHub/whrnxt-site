@@ -1582,6 +1582,50 @@ window.addEventListener('unhandledrejection', function (e) {
       'so adding one is adding an entry rather than rebuilding the screen.</p></div>';
   }
 
+  // Approving 532 trips one at a time is not a thing anybody does, and the
+  // alternative to a button is an UPDATE typed against production. It appears
+  // only when there is enough to be worth it — below five, clicking them is
+  // faster than reading a warning about clicking them.
+  function queueBulkBar(list){
+    if (section !== 'trips' || status !== 'pending' || list.length < 5) return '';
+    return '<div class="bulk">' +
+      '<span><strong style="color:var(--ink)">' + list.length.toLocaleString() + ' trips waiting.</strong> ' +
+      'Approving puts every one of them on /trips/ straight away \u2014 so this is worth a look down the list first.</span>' +
+      '<span style="flex:0 0 auto">' +
+        '<button class="btn btn-signal" type="button" data-allq="approved">Approve all ' + list.length.toLocaleString() + '</button> ' +
+        '<button class="btn btn-ghost" type="button" data-allq="rejected">Reject all</button>' +
+      '</span>' +
+    '</div>';
+  }
+
+  function moderateAll(to, btn){
+    var list = (renderQueue.data || {})[QUEUES[section].list] || [];
+    var n = list.length;
+    if (!n) return;
+    var what = to === 'approved'
+      ? 'Approve all ' + n.toLocaleString() + ' trips?\n\nEvery one goes live on /trips/ immediately.'
+      : 'Reject all ' + n.toLocaleString() + ' trips?';
+    if (!window.confirm(what + '\n\nThis can be undone by switching to the ' + to + ' tab and moving them back.')) return;
+    var was = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Working\u2026';
+    api('/api/trips/moderate-all', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      // The count travels with the request so a stale screen is refused rather
+      // than quietly moderating a different set.
+      body: JSON.stringify({ from: 'pending', to: to, expected: n })
+    }).then(function(d){
+      renderQueue.data = null;
+      // After the reload, not before: load() ends with say(''), so a message set
+      // here would be wiped by the refresh it just triggered.
+      var done = d.changed.toLocaleString() + ' trip' + (d.changed === 1 ? '' : 's') + ' ' + to +
+        (to === 'approved' ? '. They are on /trips/ now.' : '.');
+      Promise.resolve(load()).then(function(){ say(done, 'good'); });
+    }).catch(function(e){
+      btn.disabled = false; btn.textContent = was;
+      say(e.message, 'bad');
+    });
+  }
+
   function renderQueue(){
     var b = $('body');
     var q = QUEUES[section];
@@ -1598,7 +1642,7 @@ window.addEventListener('unhandledrejection', function (e) {
           : 'No ' + status + ' ' + q.noun + 's.') + '</div>';
       return;
     }
-    b.innerHTML = items.map(section === 'trips' ? tripRow : placeRow).join('');
+    b.innerHTML = queueBulkBar(items) + items.map(section === 'trips' ? tripRow : placeRow).join('');
     if (section === 'trips' && window.whrnxtCityPicker) {
       Array.prototype.forEach.call(b.querySelectorAll('.cityin'), function (el) {
         window.whrnxtCityPicker(el, { api: API });
@@ -1933,6 +1977,8 @@ window.addEventListener('unhandledrejection', function (e) {
     if (save) { saveCity(save.getAttribute('data-savecity'), save); return; }
     var opt = e.target.closest('[data-opt]');
     if (opt) { optimize(opt.getAttribute('data-id'), opt.getAttribute('data-opt'), opt); return; }
+    var allq = e.target.closest('[data-allq]');
+    if (allq) { moderateAll(allq.getAttribute('data-allq'), allq); return; }
     var act = e.target.closest('[data-act]');
     if (act) { moderate(act.getAttribute('data-id'), act.getAttribute('data-act'), act.closest('.row'), act); return; }
   });
