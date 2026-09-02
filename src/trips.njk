@@ -86,10 +86,29 @@ permalink: /trips/index.html
   // Cards go straight into the grid, never wrapped. Wrapping each city in a
   // container made the container the grid cell, so a city with two trips grew a
   // tall cell beside a short one and left a hole in the other column.
-  function show(which, label){
-    list.innerHTML = '';
-    heading.textContent = label;
+  function setHeading(label, withTotal){
+    heading.textContent = '';
     heading.hidden = !label;
+    if (!label) return;
+    heading.appendChild(document.createTextNode(label));
+    if (!withTotal) return;
+    // The count and the invitation only belong on the default view. Against a
+    // single city they would be answering a question nobody asked.
+    var tail = document.createElement('span');
+    tail.className = 'trip-heading-tail';
+    tail.appendChild(document.createTextNode(
+      ', ' + trips.length.toLocaleString() + ' shared trip' + (trips.length === 1 ? '' : 's') + ' total. '));
+    var a = document.createElement('a');
+    a.href = '/#share';
+    a.textContent = 'Submit yours here';
+    tail.appendChild(a);
+    tail.appendChild(document.createTextNode('.'));
+    heading.appendChild(tail);
+  }
+
+  function show(which, label, withTotal){
+    list.innerHTML = '';
+    setHeading(label, withTotal);
     if (!which.length) {
       var none = document.createElement('p');
       none.className = 'trip-loading';
@@ -106,7 +125,7 @@ permalink: /trips/index.html
     }).slice(0, RECENT);
     // Says what it is. A list of ten out of hundreds that does not explain
     // itself reads as the whole collection, and a small one at that.
-    show(recent, 'The ' + recent.length + ' most recently shared');
+    show(recent, 'The ' + recent.length + ' most recently shared', true);
   }
 
   function pick(name){
