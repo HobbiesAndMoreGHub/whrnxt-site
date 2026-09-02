@@ -11,12 +11,20 @@ permalink: /trips/index.html
     <p>Trips other travelers built and posted. Open one in the app and it becomes yours to follow, edit, or reorder. Every trip is reviewed by a person before it shows up here.</p>
   </div>
 
-  <!-- Built from the trips that actually loaded, so it can never offer a city
-       with nothing behind it. Hidden until then. -->
-  <div class="trip-filter" id="trip-filter" hidden>
-    <span class="label">Filter by city</span>
-    <div class="chips" id="trip-chips" role="group" aria-label="Filter trips by city"></div>
+  <!-- The list of cities comes from the trips that actually loaded, so it can
+       never suggest somewhere with nothing behind it. Hidden until then. -->
+  <div class="trip-find" id="trip-find" hidden>
+    <label class="label" for="trip-city">Find a city</label>
+    <div class="trip-find-box">
+      <input id="trip-city" type="text" autocomplete="off" spellcheck="false"
+             placeholder="Start typing — e.g. Lisbon" aria-label="Filter trips by city"
+             role="combobox" aria-expanded="false" aria-controls="trip-suggest">
+      <button type="button" id="trip-clear" hidden aria-label="Clear the filter">Clear</button>
+      <ul id="trip-suggest" class="find-suggest" role="listbox" hidden></ul>
+    </div>
   </div>
+
+  <h3 class="trip-heading" id="trip-heading" hidden></h3>
 
   <div class="trip-list" id="trip-list">
     <p class="trip-loading" id="trip-loading">Loading trips…</p>
@@ -34,17 +42,32 @@ permalink: /trips/index.html
   var list = document.getElementById('trip-list');
   var loading = document.getElementById('trip-loading');
   var empty = document.getElementById('trip-empty');
+  var find = document.getElementById('trip-find');
+  var input = document.getElementById('trip-city');
+  var clear = document.getElementById('trip-clear');
+  var suggest = document.getElementById('trip-suggest');
+  var heading = document.getElementById('trip-heading');
+
+  var RECENT = 10;
+  var trips = [], cities = [], items = [], idx = -1, chosen = '';
+
+  // Group under the first city. Older submissions used commas and cannot be
+  // split safely, so those are taken whole rather than guessed at.
+  function cityOf(t){
+    var raw = (t.cities || '').trim();
+    if (!raw) return 'Elsewhere';
+    return raw.indexOf(' · ') >= 0 ? raw.split(' · ')[0].trim() : raw;
+  }
 
   function card(t){
     var a = document.createElement('a');
     a.className = 'trip-card';
     a.href = t.link;                    // server only stores https URLs
     a.rel = 'nofollow noopener';
-    if (t.cities) {
-      var c = document.createElement('span');
-      c.className = 'label'; c.textContent = t.cities;
-      a.appendChild(c);
-    }
+    var c = document.createElement('span');
+    c.className = 'label';
+    c.textContent = cityOf(t);
+    a.appendChild(c);
     var h = document.createElement('h3');
     h.textContent = t.title;            // text, never markup — this is stranger-submitted
     a.appendChild(h);
@@ -60,100 +83,135 @@ permalink: /trips/index.html
     return a;
   }
 
+  // Cards go straight into the grid, never wrapped. Wrapping each city in a
+  // container made the container the grid cell, so a city with two trips grew a
+  // tall cell beside a short one and left a hole in the other column.
+  function show(which, label){
+    list.innerHTML = '';
+    heading.textContent = label;
+    heading.hidden = !label;
+    if (!which.length) {
+      var none = document.createElement('p');
+      none.className = 'trip-loading';
+      none.textContent = 'No trips there yet.';
+      list.appendChild(none);
+      return;
+    }
+    which.forEach(function(t){ list.appendChild(card(t)); });
+  }
+
+  function newest(){
+    var recent = trips.slice().sort(function(a, b){
+      return String(b.created_at || '').localeCompare(String(a.created_at || ''));
+    }).slice(0, RECENT);
+    // Says what it is. A list of ten out of hundreds that does not explain
+    // itself reads as the whole collection, and a small one at that.
+    show(recent, 'The ' + recent.length + ' most recently shared');
+  }
+
+  function pick(name){
+    chosen = name;
+    input.value = name;
+    clear.hidden = false;
+    closeSuggest();
+    var mine = trips.filter(function(t){ return cityOf(t) === name; });
+    show(mine, mine.length + ' trip' + (mine.length === 1 ? '' : 's') + ' in ' + name);
+  }
+
+  function reset(){
+    chosen = '';
+    input.value = '';
+    clear.hidden = true;
+    closeSuggest();
+    newest();
+  }
+
+  function closeSuggest(){
+    suggest.hidden = true;
+    suggest.innerHTML = '';
+    items = []; idx = -1;
+    input.setAttribute('aria-expanded', 'false');
+  }
+
+  function draw(){
+    if (!items.length) return closeSuggest();
+    suggest.innerHTML = items.map(function(c, i){
+      return '<li class="find-suggest-item' + (i === idx ? ' active' : '') + '" role="option" data-i="' + i + '">' +
+             '<span class="find-suggest-name"></span><span class="find-suggest-n"></span></li>';
+    }).join('');
+    Array.prototype.forEach.call(suggest.querySelectorAll('.find-suggest-item'), function(li, i){
+      li.querySelector('.find-suggest-name').textContent = items[i].name;
+      li.querySelector('.find-suggest-n').textContent = items[i].n + (items[i].n === 1 ? ' trip' : ' trips');
+    });
+    suggest.hidden = false;
+    input.setAttribute('aria-expanded', 'true');
+  }
+
+  function search(){
+    var q = input.value.trim().toLowerCase();
+    if (!q) { closeSuggest(); if (chosen) reset(); return; }
+    // Anything starting with what was typed first, then anything containing it —
+    // so "port" offers Porto before Newport.
+    var starts = [], has = [];
+    cities.forEach(function(c){
+      var k = c.name.toLowerCase();
+      if (k.indexOf(q) === 0) starts.push(c);
+      else if (k.indexOf(q) > 0) has.push(c);
+    });
+    items = starts.concat(has).slice(0, 8);
+    idx = -1;
+    draw();
+  }
+
+  input.addEventListener('input', search);
+  input.addEventListener('focus', function(){ if (input.value.trim()) search(); });
+  input.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') { closeSuggest(); return; }
+    if (!items.length) {
+      if (e.key === 'Enter' && input.value.trim()) {
+        // Typed in full and pressed enter without touching the list.
+        var exact = cities.filter(function(c){ return c.name.toLowerCase() === input.value.trim().toLowerCase(); })[0];
+        if (exact) { e.preventDefault(); pick(exact.name); }
+      }
+      return;
+    }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      idx = (idx + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+      draw();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      pick(items[idx >= 0 ? idx : 0].name);
+    }
+  });
+  input.addEventListener('blur', function(){ setTimeout(closeSuggest, 160); });
+  suggest.addEventListener('mousedown', function(e){
+    var li = e.target.closest('[data-i]');
+    if (li) { e.preventDefault(); pick(items[+li.getAttribute('data-i')].name); }
+  });
+  clear.addEventListener('click', function(){ reset(); input.focus(); });
+
   fetch(API + '/api/trips')
     .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
     .then(function(d){
-      var trips = (d && d.trips) || [];
+      trips = (d && d.trips) || [];
       loading.remove();
       if (!trips.length) { empty.hidden = false; return; }
-      // Grouped by city, cities alphabetical. A flat newest-first list is the
-      // wrong shape for this page: people arrive wanting somewhere, not
-      // whatever happened to be posted most recently.
-      var groups = {};
-      trips.forEach(function(t){
-        // Group under the first city. Older submissions used commas and cannot be
-        // split safely, so those are taken whole rather than guessed at.
-        var raw = (t.cities || '').trim();
-        var key = raw ? (raw.indexOf(' · ') >= 0 ? raw.split(' · ')[0].trim() : raw) : 'Elsewhere';
-        (groups[key] = groups[key] || []).push(t);
-      });
-      Object.keys(groups).sort(function(a, b){
-        if (a === 'Elsewhere') return 1;      // unnamed sinks to the bottom
-        if (b === 'Elsewhere') return -1;
-        return a.localeCompare(b);
-      }).forEach(function(key){
-        var sec = document.createElement('div');
-        sec.className = 'trip-group-wrap';
-        sec.setAttribute('data-city', key);
-        var h = document.createElement('h3');
-        h.className = 'trip-group';
-        h.textContent = key;
-        sec.appendChild(h);
-        groups[key].forEach(function(t){ sec.appendChild(card(t)); });
-        list.appendChild(sec);
-      });
 
-      buildFilter(groups);
+      var counts = {};
+      trips.forEach(function(t){ var c = cityOf(t); counts[c] = (counts[c] || 0) + 1; });
+      cities = Object.keys(counts).map(function(name){ return { name: name, n: counts[name] }; })
+        .sort(function(a, b){
+          if (a.name === 'Elsewhere') return 1;
+          if (b.name === 'Elsewhere') return -1;
+          return a.name.localeCompare(b.name);
+        });
+
+      if (cities.length > 1) find.hidden = false;
+      newest();
     })
     .catch(function(){
       loading.textContent = 'Could not load trips just now — please try again shortly.';
     });
-
-  // One city at a time, because that is how people arrive at this page: they
-  // want somewhere, not everywhere. With only a handful of cities a dropdown
-  // would be a click to see what the options even are, so the options are the
-  // control.
-  function buildFilter(groups){
-    var keys = Object.keys(groups);
-    if (keys.length < 2) return;            // nothing to filter between
-
-    var wrap = document.getElementById('trip-filter');
-    var chips = document.getElementById('trip-chips');
-    var order = keys.sort(function(a, b){
-      if (a === 'Elsewhere') return 1;
-      if (b === 'Elsewhere') return -1;
-      return a.localeCompare(b);
-    });
-
-    function chip(city, label, count){
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'chip';
-      b.setAttribute('data-city', city);
-      b.textContent = label;
-      var n = document.createElement('span');
-      n.className = 'chip-n';
-      n.textContent = count;
-      b.appendChild(n);
-      return b;
-    }
-
-    var total = keys.reduce(function(n, k){ return n + groups[k].length; }, 0);
-    chips.appendChild(chip('', 'All', total));
-    order.forEach(function(k){ chips.appendChild(chip(k, k, groups[k].length)); });
-    wrap.hidden = false;
-    select('');
-
-    function select(city){
-      Array.prototype.forEach.call(chips.querySelectorAll('.chip'), function(b){
-        var on = b.getAttribute('data-city') === city;
-        b.classList.toggle('on', on);
-        b.setAttribute('aria-pressed', on ? 'true' : 'false');
-      });
-      Array.prototype.forEach.call(list.querySelectorAll('.trip-group-wrap'), function(sec){
-        sec.hidden = !!city && sec.getAttribute('data-city') !== city;
-      });
-      // With one city showing, its heading is repeating the chip you just
-      // pressed. Keep it when everything is shown, where it is doing work.
-      Array.prototype.forEach.call(list.querySelectorAll('.trip-group'), function(h){
-        h.hidden = !!city;
-      });
-    }
-
-    chips.addEventListener('click', function(e){
-      var b = e.target.closest('.chip');
-      if (b) select(b.getAttribute('data-city'));
-    });
-  }
 })();
 </script>{% endraw %}
