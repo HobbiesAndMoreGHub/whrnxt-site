@@ -47,10 +47,17 @@
     function paint() {
       var light = root.getAttribute('data-theme') === 'light';
       var word = btn.querySelector('.theme-word');
-      if (word) word.textContent = light ? 'Dark mode' : 'Light mode';
+      // It says where you are, not where the click would take you. The button
+      // is a state readout that happens to be pressable, and the orb beside it
+      // is what says it can be.
+      if (word) word.textContent = light ? 'Light mode' : 'Dark mode';
       btn.setAttribute('aria-pressed', light ? 'true' : 'false');
-      btn.setAttribute('aria-label', light ? 'Switch to dark mode' : 'Switch to light mode');
-      btn.title = light ? 'Switch to dark mode' : 'Switch to light mode';
+      // The visible word has to be inside the accessible name, or a voice
+      // command for what is written on the button does not reach it.
+      var label = (light ? 'Light mode' : 'Dark mode')
+        + ', switch to ' + (light ? 'dark' : 'light');
+      btn.setAttribute('aria-label', label);
+      btn.title = label;
       if (meta) meta.setAttribute('content', light ? GROUND.light : GROUND.dark);
     }
     btn.addEventListener('click', function () {

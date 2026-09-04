@@ -14,7 +14,8 @@
      go through --accent-ink, which light redefines and dark leaves as the
      yellow it always was. */
   --accent-ink:#ffd15a; --accent-line:rgba(255,209,90,.4);
-  --nav-bg:rgba(11,14,20,.72); --overlay:rgba(4,8,14,.72);
+  --nav-bg:#0b0e14; --overlay:rgba(4,8,14,.72);
+  --hero-ink:var(--ink);
   --shadow:0 30px 70px -30px rgba(0,0,0,.7); --shadow-soft:0 12px 30px rgba(0,0,0,.45);
   --signal-dim:rgba(255,209,90,.13); --go:#57d38c;
   --ok:#3fb950; --ok-line:#238636; --warn:#d29922; --warn-line:#9e6a03; --bad:#ff8f8f;
@@ -36,8 +37,14 @@
   --field:#ffffff; --ink:#0c1219; --ink-2:#39434f; --ink-3:#4a5462;
   --muted:#66707d; --line:#d9dfe8; --line-2:#b9c3d1;
   --signal:#ffd15a; --signal-ink:#241a00; --signal-hi:#ffdd80;
-  --accent-ink:#8a6300; --accent-line:rgba(138,99,0,.45);
-  --nav-bg:rgba(246,247,250,.82); --overlay:rgba(12,18,25,.45);
+  /* Navy carries the links and the small accents. The amber that did the job
+     before was the brand yellow darkened until it was legible, which is a
+     brown — right by contrast, wrong by every other measure. */
+  --accent-ink:#17356b; --accent-line:rgba(23,53,107,.45);
+  /* The hero heading, which is near-black on every other page. Black at that
+     size on white is a wall; the red gives it the weight without the slab. */
+  --hero-ink:#8a1c1c;
+  --nav-bg:#ffffff; --overlay:rgba(12,18,25,.45);
   --shadow:0 24px 50px -28px rgba(15,23,35,.35); --shadow-soft:0 12px 30px rgba(15,23,35,.16);
   --signal-dim:rgba(255,209,90,.30); --go:#1a7f4b;
   --ok:#1a7f4b; --ok-line:#1a7f4b; --warn:#8a5a00; --warn-line:#8a5a00; --bad:#c0362c;
@@ -66,8 +73,10 @@ h1,h2,h3,h4{font-family:var(--display);font-weight:900;text-wrap:balance;letter-
 :focus-visible{outline:2px solid var(--signal);outline-offset:2px}
 
 /* nav */
-header.nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(10px);
-  background:var(--nav-bg);border-bottom:1px solid var(--line)}
+/* Opaque, both themes. A translucent bar with a blur behind it means every
+   scroll drags the page's own colours through the menu, and headings sliding
+   under it read as smudges rather than as headings. */
+header.nav{position:sticky;top:0;z-index:20;background:var(--nav-bg);border-bottom:1px solid var(--line)}
 .nav-in{display:flex;align-items:center;gap:24px;height:64px}
 .brand{font-family:var(--display);font-weight:900;font-size:20px;letter-spacing:.02em;display:flex;align-items:center;gap:8px}
 .brand .tick{color:var(--accent-ink)}
@@ -129,12 +138,12 @@ header.nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(10px);
 .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:52px;align-items:start}
 .kicker{display:inline-flex;align-items:center;gap:10px;margin-bottom:22px}
 .kicker .dot{width:7px;height:7px;border-radius:50%;background:var(--go);box-shadow:0 0 0 4px rgba(87,211,140,.16)}
-.hero h1{font-size:clamp(40px,6vw,68px);line-height:1.02}
+.hero h1{font-size:clamp(40px,6vw,68px);line-height:1.02;color:var(--hero-ink)}
 .hero h1 em{font-style:normal;color:var(--accent-ink)}
 .hero p.lead{font-size:19px;color:var(--ink-2);margin:22px 0 30px;max-width:34ch}
 .cta-row{display:flex;gap:14px;flex-wrap:wrap}
 .cta-row .btn{padding:14px 22px;font-size:16px}
-.trust{margin-top:26px;color:var(--muted);font-size:13.5px;display:flex;gap:18px;flex-wrap:wrap}
+.trust{margin:0 0 24px;color:var(--muted);font-size:13.5px;display:flex;gap:18px;flex-wrap:wrap}
 .trust b{color:var(--ink)}
 
 /* board panel */
@@ -175,6 +184,9 @@ header.nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(10px);
    "here" points at nothing. */
 .on-wide{display:inline}
 .on-narrow{display:none}
+.jump{color:var(--accent-ink);font-weight:700;text-decoration:underline;
+  text-underline-offset:3px;text-decoration-color:var(--accent-line)}
+.jump:hover{text-decoration-color:var(--accent-ink)}
 @media(max-width:900px){.on-wide{display:none}.on-narrow{display:inline}}
 
 /* ticker */
