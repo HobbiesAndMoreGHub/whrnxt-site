@@ -125,6 +125,9 @@ eleventyExcludeFromCollections: true
   .im-shot{display:block;width:100%;height:132px;object-fit:cover;background:var(--panel-2);cursor:zoom-in}
   .im-cap{display:block;padding:8px 10px 10px;font-size:12.5px;line-height:1.35;color:var(--ink)}
   .im-cap small{display:block;color:var(--muted);font-size:11.5px;margin-top:2px}
+  .im-links{display:flex;gap:12px;padding:0 10px 10px;font-size:12px}
+  .im-links a{color:var(--signal);text-decoration:none;white-space:nowrap}
+  .im-links a:hover{text-decoration:underline}
   .im-ck{position:absolute;top:8px;left:8px;width:20px;height:20px;cursor:pointer;
     accent-color:var(--signal);z-index:2}
   /* The tick is the only thing on the tile that is not the picture, so it needs
@@ -1090,6 +1093,13 @@ window.addEventListener('unhandledrejection', function (e) {
     return /^https?:/.test(v) ? v : APP_ORIGIN.replace(/\/$/, '') + '/' + v.replace(/^\//, '');
   }
 
+  // The city is stored as a slug — aberdeen_sd, new-york — and a search engine
+  // reads those as one odd word. The separators become spaces before it goes
+  // anywhere near a query.
+  function searchWords(p){
+    return String(p.name || '') + ' ' + String(p.city || '').replace(/[_-]+/g, ' ');
+  }
+
   function imagesHead(){
     return '<div class="im-bar">' +
       '<span class="im-radios">' +
@@ -1148,6 +1158,13 @@ window.addEventListener('unhandledrejection', function (e) {
           'referrerpolicy="no-referrer" data-imfull="' + esc(p.id) + '">' +
         '<span class="im-cap">' + esc(p.name) +
           '<small>' + esc(p.city || '') + ' · ' + esc(p.id) + '</small></span>' +
+        // The question a thumbnail raises is "is this even the right place",
+        // and the fastest answer is what the rest of the web has under that
+        // name. Images first, because that is the one that answers it.
+        '<span class="im-links">' +
+          '<a href="' + gimages(searchWords(p)) + '" target="_blank" rel="nofollow noopener noreferrer">Images ↗</a>' +
+          '<a href="' + gweb(searchWords(p)) + '" target="_blank" rel="nofollow noopener noreferrer">Google ↗</a>' +
+        '</span>' +
       '</div>';
     }).join('') + '</div>' + imagesPager();
   }
