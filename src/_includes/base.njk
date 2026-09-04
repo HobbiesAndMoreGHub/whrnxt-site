@@ -6,7 +6,21 @@
 <title>{% if title %}{{ title }} — {{ site.name }}{% else %}{{ site.name }} — {{ site.tagline }}{% endif %}</title>
 <meta name="description" content="{{ description or site.description }}">
 {% if noindex %}<meta name="robots" content="noindex, nofollow">{% endif %}
-<meta name="theme-color" content="#0b0e14">
+<meta name="theme-color" content="#0b0e14" id="theme-color">
+<script>
+  // Runs before the stylesheet and before the first paint. A saved preference
+  // applied from the bottom of the page is a flash of the wrong theme first,
+  // which is worse than not offering the choice at all.
+  //
+  // No prefers-color-scheme here on purpose: dark is what this site is, and a
+  // phone set to light should not silently redecorate it. Light is a decision,
+  // and the toggle in the nav is where it gets made.
+  try {
+    if (localStorage.getItem('whrnxt-theme') === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  } catch (e) {}
+</script>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta property="og:title" content="{% if title %}{{ title }} — {{ site.name }}{% else %}{{ site.name }} — where next?{% endif %}">
@@ -21,5 +35,35 @@
 {% include "nav.njk" %}
 {{ content | safe }}
 {% include "footer.njk" %}
+<script>
+  // The toggle. It names the theme you would be switching TO, so the word and
+  // the page never say the same thing twice.
+  (function () {
+    var root = document.documentElement;
+    var btn = document.getElementById('theme-btn');
+    var meta = document.getElementById('theme-color');
+    if (!btn) return;
+    var GROUND = { dark: '#0b0e14', light: '#f6f7fa' };
+    function paint() {
+      var light = root.getAttribute('data-theme') === 'light';
+      var word = btn.querySelector('.theme-word');
+      if (word) word.textContent = light ? 'Dark mode' : 'Light mode';
+      btn.setAttribute('aria-pressed', light ? 'true' : 'false');
+      btn.setAttribute('aria-label', light ? 'Switch to dark mode' : 'Switch to light mode');
+      btn.title = light ? 'Switch to dark mode' : 'Switch to light mode';
+      if (meta) meta.setAttribute('content', light ? GROUND.light : GROUND.dark);
+    }
+    btn.addEventListener('click', function () {
+      var light = root.getAttribute('data-theme') !== 'light';
+      if (light) root.setAttribute('data-theme', 'light');
+      else root.removeAttribute('data-theme');
+      // Private browsing can refuse to store this. The theme still changes for
+      // as long as the tab is open; only remembering it is lost.
+      try { localStorage.setItem('whrnxt-theme', light ? 'light' : 'dark'); } catch (e) {}
+      paint();
+    });
+    paint();
+  })();
+</script>
 </body>
 </html>
