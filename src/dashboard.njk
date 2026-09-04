@@ -121,19 +121,26 @@ eleventyExcludeFromCollections: true
      line up before it can see that one of them is wrong. */
   .im-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-top:4px}
   .im-tile{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-  .im-tile.on{border-color:var(--signal);box-shadow:0 0 0 1px var(--signal)}
+  .im-tile.rm{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad)}
+  .im-tile.ok{border-color:var(--ok);box-shadow:0 0 0 1px var(--ok)}
   .im-shot{display:block;width:100%;height:132px;object-fit:cover;background:var(--panel-2);cursor:zoom-in}
   .im-cap{display:block;padding:8px 10px 10px;font-size:12.5px;line-height:1.35;color:var(--ink)}
   .im-cap small{display:block;color:var(--muted);font-size:11.5px;margin-top:2px}
   .im-links{display:flex;gap:12px;padding:0 10px 10px;font-size:12px}
   .im-links a{color:var(--signal);text-decoration:none;white-space:nowrap}
   .im-links a:hover{text-decoration:underline}
-  .im-ck{position:absolute;top:8px;left:8px;width:20px;height:20px;cursor:pointer;
-    accent-color:var(--signal);z-index:2}
-  /* The tick is the only thing on the tile that is not the picture, so it needs
-     a ground of its own or it disappears into whatever it is sitting on. */
-  .im-ckbox{position:absolute;top:4px;left:4px;width:28px;height:28px;border-radius:8px;
-    background:rgba(11,14,20,.68);z-index:1}
+  /* Two answers, two controls, and they have to be told apart at a glance in a
+     grid of sixty. Left and red is throw it out, right and green is it is fine
+     — never the same shape in the same place meaning different things. */
+  .im-mark{position:absolute;top:6px;z-index:2;display:inline-flex;align-items:center;gap:5px;
+    padding:4px 8px 4px 6px;border-radius:8px;background:rgba(11,14,20,.78);
+    font-size:11.5px;font-weight:700;letter-spacing:.02em;cursor:pointer;color:var(--ink);
+    border:1px solid transparent}
+  .im-mark input{width:15px;height:15px;margin:0;cursor:pointer}
+  .im-rm{left:6px} .im-rm input{accent-color:var(--bad)}
+  .im-ok{right:6px} .im-ok input{accent-color:var(--ok)}
+  .im-tile.rm .im-rm{border-color:var(--bad);color:var(--bad)}
+  .im-tile.ok .im-ok{border-color:var(--ok);color:var(--ok)}
   .im-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 14px}
   .im-bar .fine{margin:0}
   .im-radios{display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:13.5px;color:var(--muted)}
@@ -1083,9 +1090,11 @@ window.addEventListener('unhandledrejection', function (e) {
   // has to survive a reload, a different machine and a week off. It is also
   // what lets the default view hide what is ticked, so the next page is always
   // pictures nobody has looked at yet — the only way a list this long ends.
-  var MARKS = [['unmarked', 'Not checked yet'], ['marked', 'Checked'], ['all', 'Everything']];
-  var images = { list: [], total: 0, markedTotal: 0, offset: 0, limit: 60,
+  var MARKS = [['unmarked', 'Not checked yet'], ['marked', 'For removal'],
+               ['ok', 'Checked as fine'], ['all', 'Everything']];
+  var images = { list: [], total: 0, removeTotal: 0, okTotal: 0, offset: 0, limit: 60,
                  city: '', q: '', marked: 'unmarked', cities: [] };
+  var imState = function(p){ return p.picture_marked_at ? 'remove' : (p.picture_ok_at ? 'ok' : 'none'); };
 
   function imageUrl(p){
     var v = String(p.image || '');
@@ -1123,12 +1132,15 @@ window.addEventListener('unhandledrejection', function (e) {
         : '0') + '</span>' +
     '</div>' +
     '<div class="im-bar">' +
-      '<button class="btn" type="button" id="im-all">Check all ' + images.list.length + ' on this page</button>' +
-      '<button class="btn btn-ghost" type="button" id="im-none"' + (images.markedTotal ? '' : ' disabled') + '>' +
-        'Uncheck everything</button>' +
-      '<button class="btn rm-go" type="button" id="im-remove"' + (images.markedTotal ? '' : ' disabled') + '>' +
-        'Remove ' + images.markedTotal.toLocaleString() + ' checked picture' + (images.markedTotal === 1 ? '' : 's') + '</button>' +
-      '<span class="fine">A tick is saved as you make it. Removing takes the photograph off the place and leaves everything else, and reaches the app at the next publish.</span>' +
+      // The common case by far: a page of pictures where nothing is wrong. One
+      // press clears the page and the next sixty arrive.
+      '<button class="btn" type="button" id="im-all">Mark all ' + images.list.length + ' on this page as fine</button>' +
+      '<button class="btn rm-go" type="button" id="im-remove"' + (images.removeTotal ? '' : ' disabled') + '>' +
+        'Remove ' + images.removeTotal.toLocaleString() + ' picture' + (images.removeTotal === 1 ? '' : 's') + ' marked for removal</button>' +
+      '<button class="btn btn-ghost" type="button" id="im-none"' + (images.removeTotal + images.okTotal ? '' : ' disabled') + '>' +
+        'Clear every mark</button>' +
+      '<span class="fine">' + images.okTotal.toLocaleString() + ' marked fine, ' +
+        images.removeTotal.toLocaleString() + ' marked for removal. Marks save as you make them and only the red ones are ever removed — which reaches the app at the next publish.</span>' +
     '</div>';
   }
 
@@ -1149,11 +1161,15 @@ window.addEventListener('unhandledrejection', function (e) {
       return;
     }
     b.innerHTML = imagesHead() + '<div class="im-grid">' + images.list.map(function(p){
-      var on = !!p.picture_marked_at;
-      return '<div class="im-tile' + (on ? ' on' : '') + '" data-imtile="' + esc(p.id) + '">' +
-        '<span class="im-ckbox"></span>' +
-        '<input class="im-ck" type="checkbox" data-imck="' + esc(p.id) + '"' + (on ? ' checked' : '') +
-          ' aria-label="Check ' + esc(p.name) + '">' +
+      var st = imState(p);
+      return '<div class="im-tile' + (st === 'remove' ? ' rm' : st === 'ok' ? ' ok' : '') +
+          '" data-imtile="' + esc(p.id) + '">' +
+        '<label class="im-mark im-rm" title="Wrong picture — take it off">' +
+          '<input type="checkbox" data-imck="' + esc(p.id) + '" value="remove"' +
+          (st === 'remove' ? ' checked' : '') + '> Remove</label>' +
+        '<label class="im-mark im-ok" title="Right picture — stop showing me this one">' +
+          '<input type="checkbox" data-imck="' + esc(p.id) + '" value="ok"' +
+          (st === 'ok' ? ' checked' : '') + '> Fine</label>' +
         '<img class="im-shot" src="' + esc(imageUrl(p)) + '" alt="" loading="lazy" ' +
           'referrerpolicy="no-referrer" data-imfull="' + esc(p.id) + '">' +
         '<span class="im-cap">' + esc(p.name) +
@@ -1183,39 +1199,51 @@ window.addEventListener('unhandledrejection', function (e) {
     document.body.appendChild(box);
   }
 
-  function markImages(ids, on){
+  // state is 'remove', 'ok' or 'none'. The counts are adjusted from what each
+  // row was BEFORE, not from how many ids were sent — ticking Fine on something
+  // already marked for removal moves it between the two totals rather than
+  // adding to one of them.
+  function markImages(ids, state){
     if (!ids.length) return Promise.resolve();
     return api('/api/admin/images/mark', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: ids, marked: !!on })
+      body: JSON.stringify({ ids: ids, state: state })
     }).then(function(){
       ids.forEach(function(id){
         images.list.forEach(function(x){
-          if (String(x.id) === String(id)) x.picture_marked_at = on ? 'now' : null;
+          if (String(x.id) !== String(id)) return;
+          var was = imState(x);
+          if (was === 'remove') images.removeTotal--;
+          if (was === 'ok') images.okTotal--;
+          if (state === 'remove') images.removeTotal++;
+          if (state === 'ok') images.okTotal++;
+          x.picture_marked_at = state === 'remove' ? 'now' : null;
+          x.picture_ok_at = state === 'ok' ? 'now' : null;
         });
       });
-      images.markedTotal = Math.max(0, images.markedTotal + (on ? ids.length : -ids.length));
+      images.removeTotal = Math.max(0, images.removeTotal);
+      images.okTotal = Math.max(0, images.okTotal);
       renderImages();
     }).catch(function(e){ say(e.message, 'bad'); });
   }
 
   function unmarkAllImages(btn){
-    if (!window.confirm('Clear every tick?\n\nThe pictures stay exactly as they are — this only forgets which ones you had picked out.')) return;
+    if (!window.confirm('Clear every mark, both kinds?\n\nThe pictures stay exactly as they are \u2014 this only forgets which ones you had been through, and puts them all back on the Not checked yet list.')) return;
     btn.disabled = true;
     api('/api/admin/images/mark', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ all: true, marked: false })
+      body: JSON.stringify({ all: true, state: 'none' })
     }).then(function(r){
-      say(r.changed.toLocaleString() + ' tick' + (r.changed === 1 ? '' : 's') + ' cleared.', 'good');
+      say(r.changed.toLocaleString() + ' mark' + (r.changed === 1 ? '' : 's') + ' cleared.', 'good');
       images.offset = 0; load();
     }).catch(function(e){ btn.disabled = false; say(e.message, 'bad'); });
   }
 
   function removeCheckedImages(btn){
-    var n = images.markedTotal;
+    var n = images.removeTotal;
     if (!n) return;
-    if (!window.confirm('Take the picture off ' + n.toLocaleString() + ' place' + (n === 1 ? '' : 's') + '?' +
-      '\n\nThe places stay, with their names and their descriptions. Only the photographs go, and one can be put back at a time under Pictures & text.')) return;
+    if (!window.confirm('Take the picture off ' + n.toLocaleString() + ' place' + (n === 1 ? '' : 's') + ' marked for removal?' +
+      '\n\nNothing marked as fine is touched. The places stay, with their names and their descriptions \u2014 only the photographs go, and one can be put back at a time under Pictures & text.')) return;
     var was = btn.textContent;
     btn.disabled = true; btn.textContent = 'Removing…';
     // The count travels with the request: the server refuses if it has moved
@@ -2335,10 +2363,12 @@ window.addEventListener('unhandledrejection', function (e) {
       load(); return;
     }
     if (e.target.closest('#im-all')) {
-      // Only what is on screen. A button that ticks 36,000 rows nobody has seen
-      // is a button that empties the site by accident.
-      markImages(images.list.filter(function(p){ return !p.picture_marked_at; })
-                            .map(function(p){ return p.id; }), true);
+      // Only what is on screen, and only ever as fine. A button that marks
+      // 36,000 unseen rows for removal is a button that empties the site by
+      // accident; one that calls a page you have just looked at fine is the
+      // ordinary case, done sixty at a time.
+      markImages(images.list.filter(function(p){ return imState(p) !== 'ok'; })
+                            .map(function(p){ return p.id; }), 'ok');
       return;
     }
     var imn = e.target.closest('#im-none');
@@ -2397,9 +2427,9 @@ window.addEventListener('unhandledrejection', function (e) {
       return;
     }
     if (t && t.hasAttribute && t.hasAttribute('data-imck')) {
-      var tile = t.closest('[data-imtile]');
-      if (tile) tile.classList.toggle('on', t.checked);
-      markImages([t.getAttribute('data-imck')], t.checked);
+      // Unticking either box means "I have not decided", and ticking one clears
+      // the other — a picture cannot be both wrong and fine.
+      markImages([t.getAttribute('data-imck')], t.checked ? t.value : 'none');
       return;
     }
     if (t && t.name === 'im-marked') {
