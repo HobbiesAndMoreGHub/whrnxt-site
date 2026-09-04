@@ -109,6 +109,18 @@ header.nav{position:sticky;top:0;z-index:20;background:var(--nav-bg);border-bott
   background:linear-gradient(90deg,#ffffff 0 50%,#15181f 50% 100%);
   border:1px solid var(--line-2);box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)}
 .theme-word{white-space:nowrap}
+
+/* ── The toggle is hidden for now: light mode is not finished. ───────────────
+   Nothing was deleted — the button is still in the nav, the light palette is
+   still in this file, and base.njk still has the script. Putting it back is
+   deleting this block and flipping THEME_TOGGLE to true in base.njk.
+
+   The two nav rules come with it. The toggle was what held the free space in
+   the bar apart: it carries auto margins on both sides and the links gave
+   theirs up so it could sit centred. Hide it without these and the links and
+   Open app collapse against the wordmark. */
+.theme-btn{display:none}
+.nav-links{margin-left:auto}
 /* Below 820px the links used to be display:none outright, so a phone had no way
    to reach anything but the footer's Articles link. They move onto their own row
    instead, and wrap within it when the four of them are wider than the screen —
@@ -131,6 +143,9 @@ header.nav{position:sticky;top:0;z-index:20;background:var(--nav-bg);border-bott
   .brand{font-size:20px}
   .theme-btn{padding:11px;border-radius:50%}
   .theme-word{display:none}
+  /* Part of the same "hidden for now" block above: on a phone the button was
+     what pushed Open app to the right edge. */
+  .nav .btn{margin-left:auto}
 }
 
 /* Yellow as TEXT on the light ground: outlined, or it is a glare rather than a

@@ -15,8 +15,13 @@
   // No prefers-color-scheme here on purpose: dark is what this site is, and a
   // phone set to light should not silently redecorate it. Light is a decision,
   // and the toggle in the nav is where it gets made.
+  // Off while light mode is unfinished — paired with the "hidden for now" block
+  // in styles.css. Left false, a preference saved earlier is ignored rather than
+  // obeyed, because otherwise anyone who switched to light before the button
+  // went away is left in it with nothing to switch back with.
+  window.THEME_TOGGLE = false;
   try {
-    if (localStorage.getItem('whrnxt-theme') === 'light') {
+    if (window.THEME_TOGGLE && localStorage.getItem('whrnxt-theme') === 'light') {
       document.documentElement.setAttribute('data-theme', 'light');
     }
   } catch (e) {}
