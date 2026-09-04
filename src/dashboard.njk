@@ -617,12 +617,47 @@ window.addEventListener('unhandledrejection', function (e) {
       '<input id="en-credit" placeholder="Credit to use for everything uploaded here" ' +
         'value="' + esc(batchCredit) + '" autocomplete="off"' + (fastPics ? '' : ' hidden') + '>' +
       '<button class="btn" type="button" id="en-bulkpics">Upload a folder\u2026</button>' +
+      '<button class="btn" type="button" id="en-audit" title="Every place that has a picture, as a spreadsheet">Download the picture audit</button>' +
+      '<span class="fine" id="en-audit-msg"></span>' +
     '</div>' +
     (fastPics
       ? '<p class="fine" style="margin:-8px 0 16px">Editors are open, Remove is one click and asks nothing. ' +
         'With a credit set, choosing a file uploads and saves it in one go.</p>'
       : '') +
     bulkBar() + bulkUploadBox();
+  }
+
+  // Downloading the picture audit. A link cannot carry the Authorization header
+  // the API wants, so it is fetched, held as a blob and handed to a link the
+  // page makes and clicks itself. 14 MB, so it says so while it works — a
+  // button that looks dead for twenty seconds gets pressed four more times.
+  function downloadAudit(city){
+    var btn = $('en-audit'), msg = $('en-audit-msg');
+    if (btn) { btn.disabled = true; }
+    if (msg) msg.textContent = 'Building the spreadsheet\u2026 this takes a moment.';
+    fetch(API + '/api/admin/image-audit.csv' + (city ? '?city=' + encodeURIComponent(city) : ''),
+      { headers: headers(), cache: 'no-store' })
+      .then(function(r){
+        if (r.status === 401) throw new Error('The API refused that credential. Sign in again.');
+        if (!r.ok) throw new Error('The export failed (' + r.status + ').');
+        return r.blob();
+      })
+      .then(function(blob){
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'whrnxt-pictures-' + (city ? city + '-' : '') + new Date().toISOString().slice(0,10) + '.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        // Revoked on a timer rather than immediately: some browsers have not
+        // finished reading the blob when click() returns, and revoking early
+        // saves an empty file.
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+        if (msg) msg.textContent = 'Saved \u2014 ' + Math.round(blob.size / 1048576) + ' MB. Open it in a spreadsheet; the view_url column shows each picture.';
+      })
+      .catch(function(e){ if (msg) msg.textContent = e.message || 'Could not build the export.'; })
+      .then(function(){ if (btn) btn.disabled = false; });
   }
 
   // Uploading a folder. Each file is named after its place, so the browser can
@@ -2051,6 +2086,7 @@ window.addEventListener('unhandledrejection', function (e) {
     if (ees) { saveText(ees.getAttribute('data-ensave'), ees); return; }
     var ped = e.target.closest('[data-picedit]');
     if (ped) { togglePic(ped.getAttribute('data-picedit')); return; }
+    if (e.target.closest('#en-audit')) { downloadAudit(enrich.city); return; }
     if (e.target.closest('#en-bulkpics')) {
       var box = $('bulk-pics');
       if (box) {
