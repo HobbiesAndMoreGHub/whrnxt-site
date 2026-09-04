@@ -735,6 +735,7 @@ window.addEventListener('unhandledrejection', function (e) {
                 : '') +
               (safeHref(p.website) ? '<a class="btn rec-btn" href="' + esc(safeHref(p.website)) + '" target="_blank" rel="nofollow noopener noreferrer">Website \u2197</a>' : '') +
               (safeHref(p.wiki) ? '<a class="btn rec-btn" href="' + esc(safeHref(p.wiki)) + '" target="_blank" rel="nofollow noopener noreferrer">Wikipedia \u2197</a>' : '') +
+              '<a class="btn rec-btn" href="' + esc(wikisearch((p.name||'') + ' ' + (p.city||''))) + '" target="_blank" rel="nofollow noopener noreferrer">Search Wikipedia \u2197</a>' +
             '</div>' +
             editBox(p) +
             pictureBox(p) +
@@ -1287,6 +1288,14 @@ window.addEventListener('unhandledrejection', function (e) {
     return 'https://www.google.com/search?tbm=isch&q=' + encodeURIComponent(query);
   }
 
+  // Wikipedia's own search rather than Google's site: search - an exact title
+  // lands on the article and anything else lands on results, which is the two
+  // things you want from here. The Wikipedia button beside it only appears when
+  // the row already carries a link; this one is for the rows that do not.
+  function wikisearch(query){
+    return 'https://en.wikipedia.org/w/index.php?search=' + encodeURIComponent(query);
+  }
+
   function gmaps(query, placeId){
     return 'https://www.google.com/maps/search/?api=1&hl=en&query=' + encodeURIComponent(query) +
       (placeId ? '&query_place_id=' + encodeURIComponent(placeId) : '');
@@ -1354,7 +1363,8 @@ window.addEventListener('unhandledrejection', function (e) {
         '<p class="meta" id="mail-out"></p>' +
       '</div>' +
       '<div class="row"><h3>Publish to the app</h3>' +
-        '<p>Locations you pin and places you remove are saved straight away, but they live in the database until the app is rebuilt from it. ' +
+        '<p>Locations you pin, pictures you change, descriptions you rewrite and places you remove are saved straight away, ' +
+        'but they live in the database until the app is rebuilt from it. ' +
         'This is what carries them across — nothing else does, so an edit waits here until you press it.</p>' +
         '<div class="acts"><button class="btn btn-signal" id="pub-go"' + (publishing ? ' disabled' : '') + '>' +
           (publishing ? 'Publishing\u2026' : 'Publish now') + '</button>' +
@@ -1380,6 +1390,7 @@ window.addEventListener('unhandledrejection', function (e) {
     if (!p || !p.total) return '';
     var bits = [];
     if (p.locations) bits.push(p.locations + ' location' + (p.locations === 1 ? '' : 's') + ' pinned');
+    if (p.pictures) bits.push(p.pictures + ' picture' + (p.pictures === 1 ? '' : 's') + ' changed');
     if (p.text) bits.push(p.text + ' description' + (p.text === 1 ? '' : 's') + ' edited');
     if (p.removals) bits.push(p.removals + ' place' + (p.removals === 1 ? '' : 's') + ' removed');
     var last = p.lastPublishedAt
