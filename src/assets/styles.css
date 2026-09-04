@@ -32,10 +32,15 @@
    uses of it become a dark amber, and the greens and reds darken for the same
    reason — a colour that carries meaning has to survive its background. */
 :root[data-theme="light"]{
-  --ground:#f6f7fa; --panel:#ffffff; --panel-2:#eaeef4; --panel-3:#f1f4f9;
-  --panel-grad:linear-gradient(180deg,#ffffff,#f2f5fa);
-  --field:#ffffff; --ink:#0c1219; --ink-2:#39434f; --ink-3:#4a5462;
-  --muted:#66707d; --line:#d9dfe8; --line-2:#b9c3d1;
+  /* White ground, near-black type, yellow doing the accenting — the look of
+     the reference deck. The greys were a blue-tinted set carried over from the
+     dark theme's line colours; body text at #39434f on white is a soft grey
+     that reads as disabled next to a black heading, so it drops to #242a31 and
+     the rest of the scale comes down with it. */
+  --ground:#ffffff; --panel:#fbfbfc; --panel-2:#f0f1f3; --panel-3:#f7f8f9;
+  --panel-grad:linear-gradient(180deg,#ffffff,#f7f8fa);
+  --field:#ffffff; --ink:#0b0e12; --ink-2:#242a31; --ink-3:#333a42;
+  --muted:#5b646e; --line:#dcdfe4; --line-2:#b7bcc5;
   --signal:#ffd15a; --signal-ink:#241a00; --signal-hi:#ffdd80;
   /* Navy carries the links and the small accents. The amber that did the job
      before was the brand yellow darkened until it was legible, which is a
@@ -79,7 +84,7 @@ h1,h2,h3,h4{font-family:var(--display);font-weight:900;text-wrap:balance;letter-
 header.nav{position:sticky;top:0;z-index:20;background:var(--nav-bg);border-bottom:1px solid var(--line)}
 .nav-in{display:flex;align-items:center;gap:24px;height:64px}
 .brand{font-family:var(--display);font-weight:900;font-size:26px;letter-spacing:.02em;display:flex;align-items:center;gap:8px}
-.brand .tick{color:var(--accent-ink)}
+.brand .tick{color:var(--signal)}
 .nav-links{display:flex;gap:26px;font-size:14.5px;font-weight:600}
 .nav-links a{color:var(--accent-ink)}
 .nav-links a:hover{color:var(--ink)}
