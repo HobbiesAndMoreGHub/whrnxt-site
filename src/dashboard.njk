@@ -116,6 +116,33 @@ eleventyExcludeFromCollections: true
   .tabsort{margin-left:auto;background:#0d1117;border:1px solid var(--line);color:var(--muted);
     border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
   .tabsort:hover{color:var(--ink)}
+  /* Every picture: a wall of thumbnails. Fixed-height tiles because a grid of
+     mixed aspect ratios is a grid you cannot scan — the eye needs the rows to
+     line up before it can see that one of them is wrong. */
+  .im-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-top:4px}
+  .im-tile{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .im-tile.on{border-color:var(--signal);box-shadow:0 0 0 1px var(--signal)}
+  .im-shot{display:block;width:100%;height:132px;object-fit:cover;background:var(--panel-2);cursor:zoom-in}
+  .im-cap{display:block;padding:8px 10px 10px;font-size:12.5px;line-height:1.35;color:var(--ink)}
+  .im-cap small{display:block;color:var(--muted);font-size:11.5px;margin-top:2px}
+  .im-ck{position:absolute;top:8px;left:8px;width:20px;height:20px;cursor:pointer;
+    accent-color:var(--signal);z-index:2}
+  /* The tick is the only thing on the tile that is not the picture, so it needs
+     a ground of its own or it disappears into whatever it is sitting on. */
+  .im-ckbox{position:absolute;top:4px;left:4px;width:28px;height:28px;border-radius:8px;
+    background:rgba(11,14,20,.68);z-index:1}
+  .im-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 14px}
+  .im-bar .fine{margin:0}
+  .im-radios{display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:13.5px;color:var(--muted)}
+  .im-radios label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+  .im-radios input{accent-color:var(--signal);cursor:pointer}
+  /* Full size, over everything. A thumbnail says a picture is of a building; it
+     takes the whole picture to say it is of the wrong building. */
+  .im-full{position:fixed;inset:0;background:rgba(4,8,14,.9);z-index:900;display:flex;
+    align-items:center;justify-content:center;flex-direction:column;gap:12px;padding:24px;cursor:zoom-out}
+  .im-full img{max-width:100%;max-height:78vh;border-radius:10px;border:1px solid var(--line)}
+  .im-full p{margin:0;color:var(--ink);font-size:14px;text-align:center;max-width:70ch}
+  .im-full p span{display:block;color:var(--muted);font-size:12.5px;margin-top:4px}
   .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel-2)}
   .ctab{width:100%;border-collapse:collapse;font-size:13.5px}
   .ctab th{position:sticky;top:0;background:#141a24;color:var(--muted);font-weight:600;text-align:right;
@@ -231,6 +258,7 @@ eleventyExcludeFromCollections: true
     <button class="navb" data-sec="unpinned">Unverified locations <span class="pill" id="pill-unpinned" hidden></span></button>
     <button class="navb" data-sec="cities">Cities</button>
     <button class="navb" data-sec="enrich">Pictures &amp; text <span class="pill" id="pill-enrich" hidden></span></button>
+    <button class="navb" data-sec="images">Every picture</button>
     <button class="navb" data-sec="removed">Removed places</button>
     <button class="navb" data-sec="users">Users</button>
     <div class="side-foot">
@@ -407,6 +435,7 @@ window.addEventListener('unhandledrejection', function (e) {
     unpinned: { title:'Unverified locations', sub:'Places with no Google establishment id, so nothing has confirmed where they are. Pin one and it leaves this list for good \u2014 whether Google matched it or you placed it yourself.' },
     cities:   { title:'Cities',               sub:'What each city actually contains. A total does not say whether a city is thin \u2014 forty places can be thirty-five restaurants and a bus station. Sights is the column that matters; food fills up from imports and transit from the airport sweep.' },
     enrich:   { title:'Pictures & text',      sub:'What is thin or missing, and the words you can do something about. Filter down to a city or a kind of place first \u2014 38,000 places have no picture, and no list that long is a to-do list.' },
+    images:   { title:'Every picture',        sub:'A wall of thumbnails, because a picture of the wrong thing is obvious on sight and invisible in a list. Tick the wrong ones — a tick is saved, so they drop out of this view and the next page is always pictures nobody has looked at yet — then take them all off at once.' },
     removed:  { title:'Removed places',       sub:'Taken out of the database because there was nothing to pin \u2014 closed, moved, never there. Nothing is thrown away: the whole entry is kept here and can be put back. Run tools/sync_pg_to_data.js to carry a removal into the app.' },
     users:    { title:'Users',              sub:'Not built yet.' }
   };
@@ -1045,6 +1074,148 @@ window.addEventListener('unhandledrejection', function (e) {
       (more ? '<button class="btn" type="button" data-enpage="next">Next \u2192</button>' : '') + '</div>';
   }
 
+  // ── Every picture ─────────────────────────────────────────────────────────
+  // A tick is a row in the database, not something this browser remembers. The
+  // job is 36,000 pictures long and nobody does that in one sitting, so a tick
+  // has to survive a reload, a different machine and a week off. It is also
+  // what lets the default view hide what is ticked, so the next page is always
+  // pictures nobody has looked at yet — the only way a list this long ends.
+  var MARKS = [['unmarked', 'Not checked yet'], ['marked', 'Checked'], ['all', 'Everything']];
+  var images = { list: [], total: 0, markedTotal: 0, offset: 0, limit: 60,
+                 city: '', q: '', marked: 'unmarked', cities: [] };
+
+  function imageUrl(p){
+    var v = String(p.image || '');
+    if (!v) return '';
+    return /^https?:/.test(v) ? v : APP_ORIGIN.replace(/\/$/, '') + '/' + v.replace(/^\//, '');
+  }
+
+  function imagesHead(){
+    return '<div class="im-bar">' +
+      '<span class="im-radios">' +
+        MARKS.map(function(m){
+          return '<label><input type="radio" name="im-marked" value="' + m[0] + '"' +
+            (m[0] === images.marked ? ' checked' : '') + '> ' + esc(m[1]) + '</label>';
+        }).join('') +
+      '</span>' +
+      '<select id="im-city">' +
+        '<option value="">Every city</option>' +
+        images.cities.map(function(c){
+          return '<option value="' + esc(c.city) + '"' + (c.city === images.city ? ' selected' : '') + '>' +
+            esc(c.city) + ' (' + c.n + ')</option>';
+        }).join('') +
+      '</select>' +
+      '<input id="im-q" placeholder="Name contains…" value="' + esc(images.q) + '" autocomplete="off">' +
+      '<button class="btn" type="button" id="im-go">Filter</button>' +
+      '<span class="fine">' + (images.total
+        ? (images.offset + 1) + '–' + Math.min(images.offset + images.limit, images.total) +
+          ' of ' + images.total.toLocaleString()
+        : '0') + '</span>' +
+    '</div>' +
+    '<div class="im-bar">' +
+      '<button class="btn" type="button" id="im-all">Check all ' + images.list.length + ' on this page</button>' +
+      '<button class="btn btn-ghost" type="button" id="im-none"' + (images.markedTotal ? '' : ' disabled') + '>' +
+        'Uncheck everything</button>' +
+      '<button class="btn rm-go" type="button" id="im-remove"' + (images.markedTotal ? '' : ' disabled') + '>' +
+        'Remove ' + images.markedTotal.toLocaleString() + ' checked picture' + (images.markedTotal === 1 ? '' : 's') + '</button>' +
+      '<span class="fine">A tick is saved as you make it. Removing takes the photograph off the place and leaves everything else, and reaches the app at the next publish.</span>' +
+    '</div>';
+  }
+
+  function imagesPager(){
+    var more = images.offset + images.limit < images.total;
+    var back = images.offset > 0;
+    if (!more && !back) return '';
+    return '<div class="acts" style="margin-top:16px">' +
+      (back ? '<button class="btn" type="button" data-impage="prev">← Previous</button>' : '') +
+      (more ? '<button class="btn" type="button" data-impage="next">Next →</button>' : '') + '</div>';
+  }
+
+  function renderImages(){
+    var b = $('body');
+    if (busy) { b.innerHTML = imagesHead() + '<div class="empty">Loading…</div>'; return; }
+    if (!images.list.length) {
+      b.innerHTML = imagesHead() + '<div class="empty">Nothing matches that.</div>';
+      return;
+    }
+    b.innerHTML = imagesHead() + '<div class="im-grid">' + images.list.map(function(p){
+      var on = !!p.picture_marked_at;
+      return '<div class="im-tile' + (on ? ' on' : '') + '" data-imtile="' + esc(p.id) + '">' +
+        '<span class="im-ckbox"></span>' +
+        '<input class="im-ck" type="checkbox" data-imck="' + esc(p.id) + '"' + (on ? ' checked' : '') +
+          ' aria-label="Check ' + esc(p.name) + '">' +
+        '<img class="im-shot" src="' + esc(imageUrl(p)) + '" alt="" loading="lazy" ' +
+          'referrerpolicy="no-referrer" data-imfull="' + esc(p.id) + '">' +
+        '<span class="im-cap">' + esc(p.name) +
+          '<small>' + esc(p.city || '') + ' · ' + esc(p.id) + '</small></span>' +
+      '</div>';
+    }).join('') + '</div>' + imagesPager();
+  }
+
+  // Full size, because a thumbnail says a picture is of a building and it takes
+  // the whole picture to say it is of the wrong building.
+  function openFull(id){
+    var p = images.list.filter(function(x){ return String(x.id) === String(id); })[0];
+    if (!p) return;
+    var box = document.createElement('div');
+    box.className = 'im-full';
+    box.innerHTML = '<img src="' + esc(imageUrl(p)) + '" alt="">' +
+      '<p>' + esc(p.name) + '<span>' + esc(p.city || '') + ' · ' + esc(p.id) +
+      (p.image_attribution ? ' · ' + esc(p.image_attribution) : '') + '</span></p>';
+    box.addEventListener('click', function(){ box.remove(); });
+    document.body.appendChild(box);
+  }
+
+  function markImages(ids, on){
+    if (!ids.length) return Promise.resolve();
+    return api('/api/admin/images/mark', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: ids, marked: !!on })
+    }).then(function(){
+      ids.forEach(function(id){
+        images.list.forEach(function(x){
+          if (String(x.id) === String(id)) x.picture_marked_at = on ? 'now' : null;
+        });
+      });
+      images.markedTotal = Math.max(0, images.markedTotal + (on ? ids.length : -ids.length));
+      renderImages();
+    }).catch(function(e){ say(e.message, 'bad'); });
+  }
+
+  function unmarkAllImages(btn){
+    if (!window.confirm('Clear every tick?\n\nThe pictures stay exactly as they are — this only forgets which ones you had picked out.')) return;
+    btn.disabled = true;
+    api('/api/admin/images/mark', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ all: true, marked: false })
+    }).then(function(r){
+      say(r.changed.toLocaleString() + ' tick' + (r.changed === 1 ? '' : 's') + ' cleared.', 'good');
+      images.offset = 0; load();
+    }).catch(function(e){ btn.disabled = false; say(e.message, 'bad'); });
+  }
+
+  function removeCheckedImages(btn){
+    var n = images.markedTotal;
+    if (!n) return;
+    if (!window.confirm('Take the picture off ' + n.toLocaleString() + ' place' + (n === 1 ? '' : 's') + '?' +
+      '\n\nThe places stay, with their names and their descriptions. Only the photographs go, and one can be put back at a time under Pictures & text.')) return;
+    var was = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Removing…';
+    // The count travels with the request: the server refuses if it has moved
+    // since this screen was drawn, so a stale page cannot strip a different set.
+    api('/api/admin/images/remove', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ all: true, expected: n })
+    }).then(function(r){
+      say(r.changed.toLocaleString() + ' picture' + (r.changed === 1 ? '' : 's') +
+          ' removed. They leave the app at the next publish.', 'good');
+      images.offset = 0; load();
+    }).catch(function(e){
+      btn.disabled = false; btn.textContent = was;
+      say(e.message, 'bad');
+    });
+  }
+
   function toggleEdit(id, on){
     var box = document.querySelector(attr('data-enbox', id));
     if (!box) return;
@@ -1361,12 +1532,14 @@ window.addEventListener('unhandledrejection', function (e) {
       b.classList.toggle('on', b.getAttribute('data-sec') === section);
     });
     show($('tabs'), section === 'trips' || section === 'places');
-    if (section === 'unpinned' || section === 'removed' || section === 'enrich' || section === 'cities') show($('tabs'), false);
+    if (section === 'unpinned' || section === 'removed' || section === 'enrich'
+        || section === 'cities' || section === 'images') show($('tabs'), false);
     if (section === 'overview') return renderOverview();
     if (section === 'users')    return renderUsers();
     if (section === 'unpinned') return renderUnpinned();
     if (section === 'removed')  return renderRemoved();
     if (section === 'enrich')   return renderEnrich();
+    if (section === 'images')   return renderImages();
     if (section === 'cities')   return renderCities();
     return renderQueue();
   }
@@ -1932,6 +2105,19 @@ window.addEventListener('unhandledrejection', function (e) {
         render(); say('');
       }).catch(function(e){ busy = false; fail(e); });
     }
+    if (section === 'images') {
+      busy = true; render(); say('Loading…');
+      return api('/api/admin/images?limit=' + images.limit + '&offset=' + images.offset +
+                 '&marked=' + encodeURIComponent(images.marked) +
+                 (images.city ? '&city=' + encodeURIComponent(images.city) : '') +
+                 (images.q ? '&q=' + encodeURIComponent(images.q) : ''))
+        .then(function(d){
+          busy = false;
+          images.list = d.places || []; images.total = d.total || 0;
+          images.markedTotal = d.markedTotal || 0; images.cities = d.cities || [];
+          render(); say('');
+        }).catch(function(e){ busy = false; fail(e); });
+    }
     if (section === 'removed') {
       busy = true; render(); say('Loading…');
       return api('/api/admin/removed?limit=200').then(function(d){
@@ -2124,6 +2310,30 @@ window.addEventListener('unhandledrejection', function (e) {
     if (pnd) { markNeeded(pnd.getAttribute('data-picneed'), pnd.getAttribute('data-on') === '1', pnd); return; }
     var blk = e.target.closest('[data-bulk]');
     if (blk) { bulkMark(blk.getAttribute('data-bulk') === 'on', blk); return; }
+    var imf = e.target.closest('[data-imfull]');
+    if (imf) { openFull(imf.getAttribute('data-imfull')); return; }
+    var imp = e.target.closest('[data-impage]');
+    if (imp) {
+      images.offset = Math.max(0, images.offset + (imp.getAttribute('data-impage') === 'next' ? images.limit : -images.limit));
+      load(); return;
+    }
+    if (e.target.closest('#im-all')) {
+      // Only what is on screen. A button that ticks 36,000 rows nobody has seen
+      // is a button that empties the site by accident.
+      markImages(images.list.filter(function(p){ return !p.picture_marked_at; })
+                            .map(function(p){ return p.id; }), true);
+      return;
+    }
+    var imn = e.target.closest('#im-none');
+    if (imn) { unmarkAllImages(imn); return; }
+    var imr = e.target.closest('#im-remove');
+    if (imr) { removeCheckedImages(imr); return; }
+    if (e.target.closest('#im-go')) {
+      var iq = $('im-q'), ic = $('im-city');
+      images.q = iq ? iq.value.trim() : '';
+      images.city = ic ? ic.value : '';
+      images.offset = 0; load(); return;
+    }
     var epg = e.target.closest('[data-enpage]');
     if (epg) {
       enrich.offset = Math.max(0, enrich.offset + (epg.getAttribute('data-enpage') === 'next' ? enrich.limit : -enrich.limit));
@@ -2169,6 +2379,16 @@ window.addEventListener('unhandledrejection', function (e) {
       load();
       return;
     }
+    if (t && t.hasAttribute && t.hasAttribute('data-imck')) {
+      var tile = t.closest('[data-imtile]');
+      if (tile) tile.classList.toggle('on', t.checked);
+      markImages([t.getAttribute('data-imck')], t.checked);
+      return;
+    }
+    if (t && t.name === 'im-marked') {
+      images.marked = t.value; images.offset = 0; images.city = ''; load(); return;
+    }
+    if (t && t.id === 'im-city') { images.city = t.value; images.offset = 0; load(); return; }
     if (t && t.id === 'en-fast') {
       setFast(t.checked);
       renderEnrich();
@@ -2198,6 +2418,7 @@ window.addEventListener('unhandledrejection', function (e) {
   document.addEventListener('keydown', function(e){
     if (e.key !== 'Enter') return;
     if (e.target && e.target.id === 'en-q') { e.preventDefault(); enrich.q = e.target.value.trim(); enrich.offset = 0; load(); }
+    if (e.target && e.target.id === 'im-q') { e.preventDefault(); images.q = e.target.value.trim(); images.offset = 0; load(); }
     if (e.target && e.target.id === 'cty-q') { e.preventDefault(); cityRep.q = e.target.value.trim(); renderCities(); }
     if (e.target && e.target.id === 'unp-q') { e.preventDefault(); unpinned.q = e.target.value.trim(); unpinned.offset = 0; load(); }
   });
