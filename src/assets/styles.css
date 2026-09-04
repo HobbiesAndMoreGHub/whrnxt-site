@@ -201,6 +201,8 @@ header.nav{position:sticky;top:0;z-index:20;background:var(--nav-bg);border-bott
 .demo-foot .btn{font-size:14.5px;padding:10px 16px}
 .demo-fine{padding:0 18px 15px;margin:0;color:var(--muted);font-size:12.5px;line-height:1.5;background:var(--panel-3)}
 @media(max-width:900px){.hero-grid{grid-template-columns:1fr;gap:40px}.hero{padding:26px 0 24px}
+  body > section.block:first-of-type,
+  body > article.article{padding-top:26px}
   .demo-screen{height:min(520px,70vh)}}
 
 /* The lead says "in the window here" beside the app window and "in the window
@@ -223,6 +225,16 @@ header.nav{position:sticky;top:0;z-index:20;background:var(--nav-bg);border-bott
 
 /* feature/section blocks */
 section.block{padding:76px 0}
+/* The first thing on a page starts under the menu bar, not a screen below it.
+   76px is the rhythm BETWEEN sections and reads as breathing room there; at the
+   top of the page there is nothing above it to breathe from, so it reads as the
+   page having failed to load. Same 34px the home page's hero uses.
+
+   :first-of-type rather than :first-child because these pages put a stylesheet
+   link before the section, and on the home page it matches nothing — the first
+   section there is the hero, so the blocks further down keep their spacing. */
+body > section.block:first-of-type,
+body > article.article{padding-top:34px}
 .sec-head{max-width:60ch;margin-bottom:44px}
 .sec-head h2{font-size:clamp(28px,4vw,40px);margin-top:12px;line-height:1.08}
 .sec-head p{color:var(--ink-2);margin:14px 0 0}
