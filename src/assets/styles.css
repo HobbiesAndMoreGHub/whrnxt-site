@@ -142,9 +142,16 @@ header.nav{position:sticky;top:0;z-index:20;background:var(--nav-bg);border-bott
   paint-order:stroke fill;
 }
 :root[data-theme="light"] .brand .tick{
-  -webkit-text-stroke:1px var(--ink);
+  -webkit-text-stroke:2px var(--ink);
   paint-order:stroke fill;
 }
+/* Every yellow button gets the same edge the yellow words do. box-sizing is
+   border-box everywhere here, so the 2px comes out of the padding and nothing
+   moves. The mode and tag pills are yellow buttons too — leaving them bare
+   beside an outlined one is how a palette starts looking accidental. */
+:root[data-theme="light"] .btn-signal,
+:root[data-theme="light"] .mode-tab.is-on,
+:root[data-theme="light"] .tag-btn.on{border:2px solid var(--ink)}
 
 /* hero */
 /* The heading and the app window start on the same line. They used to be
