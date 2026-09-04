@@ -406,7 +406,7 @@ window.addEventListener('unhandledrejection', function (e) {
     places:   { title:'Place submissions',  sub:'From /add-place/. Approving marks it ready for tools/promote_submissions.js, which resolves the real location and writes it into the data files.' },
     unpinned: { title:'Unverified locations', sub:'Places with no Google establishment id, so nothing has confirmed where they are. Pin one and it leaves this list for good \u2014 whether Google matched it or you placed it yourself.' },
     cities:   { title:'Cities',               sub:'What each city actually contains. A total does not say whether a city is thin \u2014 forty places can be thirty-five restaurants and a bus station. Sights is the column that matters; food fills up from imports and transit from the airport sweep.' },
-    enrich:   { title:'Pictures & text',      sub:'What is thin or missing, and the words you can do something about. Filter down to a city first \u2014 38,000 places have no picture, and no list that long is a to-do list.' },
+    enrich:   { title:'Pictures & text',      sub:'What is thin or missing, and the words you can do something about. Filter down to a city or a kind of place first \u2014 38,000 places have no picture, and no list that long is a to-do list.' },
     removed:  { title:'Removed places',       sub:'Taken out of the database because there was nothing to pin \u2014 closed, moved, never there. Nothing is thrown away: the whole entry is kept here and can be put back. Run tools/sync_pg_to_data.js to carry a removal into the app.' },
     users:    { title:'Users',              sub:'Not built yet.' }
   };
@@ -541,8 +541,20 @@ window.addEventListener('unhandledrejection', function (e) {
     ['edited',      'Text edited here'],
     ['',            'Everything']
   ];
+  // What a row is, next to what it is missing. The three buckets are the ones
+  // the Cities table already counts — sights is everything that is neither
+  // food nor transit — plus events, which every other view of places hides
+  // because they expire. Picking one is what turns 38,000 pictureless rows into
+  // a job somebody can pick up: the landmarks, or the stations, or the cafes.
+  var KINDS = [
+    ['',        'Everything'],
+    ['sights',  'Sights'],
+    ['transit', 'Transit'],
+    ['events',  'Events'],
+    ['food',    'Food & drink']
+  ];
   var enrich = { list: [], total: 0, offset: 0, limit: 25, q: '', city: '', category: '',
-                 missing: 'picture', cities: [], categories: [], listsFor: null };
+                 kind: '', missing: 'picture', cities: [], categories: [], listsFor: null };
 
   // Fast mode. Doing this to one place is a few clicks; doing it to four hundred
   // is the same few clicks four hundred times, and that is the whole difficulty.
@@ -572,6 +584,11 @@ window.addEventListener('unhandledrejection', function (e) {
       '<select id="en-missing">' +
         MISSING.map(function(m){
           return '<option value="' + m[0] + '"' + (m[0] === enrich.missing ? ' selected' : '') + '>' + esc(m[1]) + '</option>';
+        }).join('') +
+      '</select>' +
+      '<select id="en-kind">' +
+        KINDS.map(function(k){
+          return '<option value="' + k[0] + '"' + (k[0] === enrich.kind ? ' selected' : '') + '>' + esc(k[1]) + '</option>';
         }).join('') +
       '</select>' +
       '<select id="en-city">' +
@@ -972,7 +989,8 @@ window.addEventListener('unhandledrejection', function (e) {
       // The count travels with the request: the server refuses if the filter no
       // longer matches it, so a stale screen cannot quietly mark the wrong set.
       body: JSON.stringify({ notNeeded: notNeeded, expected: n,
-        missing: enrich.missing, city: enrich.city, category: enrich.category, q: enrich.q })
+        missing: enrich.missing, kind: enrich.kind, city: enrich.city,
+        category: enrich.category, q: enrich.q })
     }).then(function(r){
       say(r.changed.toLocaleString() + ' place' + (r.changed === 1 ? '' : 's') + ' updated.', 'good');
       enrich.offset = 0; enrich.listsFor = null; load();
@@ -1253,7 +1271,10 @@ window.addEventListener('unhandledrejection', function (e) {
     // Not "aalborg-aalborg-castle": when the name already opens with the city,
     // repeating it only makes the search worse.
     var q = (c && n.indexOf(c + '-') !== 0 && n !== c) ? c + '-' + n : n;
-    return 'https://www.shutterstock.com/search/' + encodeURIComponent(q);
+    // enableUnlimitedFilter=true limits results to the Unlimited-plan
+    // catalogue, which is the only half of it we can actually license.
+    return 'https://www.shutterstock.com/search/' + encodeURIComponent(q) +
+           '?enableUnlimitedFilter=true';
   }
 
   // The map answers "where is it". These answer "what is it" and "what does it
@@ -1842,9 +1863,10 @@ window.addEventListener('unhandledrejection', function (e) {
       // that changes and reused when it has not.
       // The option lists depend on the filter, so they are refetched when any
       // part of it moves and reused when none of it has.
-      var key = [enrich.missing, enrich.city, enrich.category, enrich.q].join('\u0000');
+      var key = [enrich.missing, enrich.kind, enrich.city, enrich.category, enrich.q].join('\u0000');
       var listReq = enrich.listsFor !== key
         ? api('/api/admin/place-cities?missing=' + encodeURIComponent(enrich.missing) +
+              (enrich.kind ? '&kind=' + encodeURIComponent(enrich.kind) : '') +
               (enrich.city ? '&city=' + encodeURIComponent(enrich.city) : '') +
               (enrich.category ? '&category=' + encodeURIComponent(enrich.category) : '') +
               (enrich.q ? '&q=' + encodeURIComponent(enrich.q) : ''))
@@ -1854,6 +1876,7 @@ window.addEventListener('unhandledrejection', function (e) {
       return listReq.then(function(){
         return api('/api/admin/places?limit=' + enrich.limit + '&offset=' + enrich.offset +
                    '&missing=' + encodeURIComponent(enrich.missing) +
+                   (enrich.kind ? '&kind=' + encodeURIComponent(enrich.kind) : '') +
                    (enrich.city ? '&city=' + encodeURIComponent(enrich.city) : '') +
                    (enrich.category ? '&category=' + encodeURIComponent(enrich.category) : '') +
                    (enrich.q ? '&q=' + encodeURIComponent(enrich.q) : ''));
@@ -2060,10 +2083,11 @@ window.addEventListener('unhandledrejection', function (e) {
       load(); return;
     }
     if (e.target.closest('#en-go')) {
-      var qb = $('en-q'), cb = $('en-city'), mb = $('en-missing'), tb = $('en-cat');
+      var qb = $('en-q'), cb = $('en-city'), mb = $('en-missing'), tb = $('en-cat'), kb = $('en-kind');
       enrich.q = qb ? qb.value.trim() : '';
       enrich.city = cb ? cb.value : '';
       enrich.category = tb ? tb.value : '';
+      enrich.kind = kb ? kb.value : '';
       enrich.missing = mb ? mb.value : '';
       enrich.offset = 0; load(); return;
     }
@@ -2114,10 +2138,12 @@ window.addEventListener('unhandledrejection', function (e) {
       uploadFile(pid, t.files[0], document.querySelector(attr('data-picpick', pid)));
       return;
     }
-    if (!t || (t.id !== 'en-missing' && t.id !== 'en-city' && t.id !== 'en-cat')) return;
+    if (!t || (t.id !== 'en-missing' && t.id !== 'en-kind' && t.id !== 'en-city' && t.id !== 'en-cat')) return;
     // Changing what you are looking for drops the narrower choices, because a
-    // city that had 400 rows under one filter may have none under the next.
+    // city that had 400 rows under one filter may have none under the next, and
+    // a type that exists under Food is not one Transit can offer at all.
     if (t.id === 'en-missing') { enrich.missing = t.value; enrich.city = ''; enrich.category = ''; }
+    else if (t.id === 'en-kind') { enrich.kind = t.value; enrich.city = ''; enrich.category = ''; }
     else if (t.id === 'en-cat') { enrich.category = t.value; }
     else { enrich.city = t.value; }
     enrich.offset = 0; load();
