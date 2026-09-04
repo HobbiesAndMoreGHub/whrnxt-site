@@ -46,9 +46,9 @@
      before was the brand yellow darkened until it was legible, which is a
      brown — right by contrast, wrong by every other measure. */
   --accent-ink:#17356b; --accent-line:rgba(23,53,107,.45);
-  /* The hero heading, which is near-black on every other page. Black at that
-     size on white is a wall; the red gives it the weight without the slab. */
-  --hero-ink:#8a1c1c;
+  /* Black, like the reference: the heading carries the weight and the yellow
+     carries the accent. */
+  --hero-ink:var(--ink);
   --nav-bg:#ffffff; --overlay:rgba(12,18,25,.45);
   --shadow:0 24px 50px -28px rgba(15,23,35,.35); --shadow-soft:0 12px 30px rgba(15,23,35,.16);
   --signal-dim:rgba(255,209,90,.30); --go:#1a7f4b;
@@ -131,6 +131,19 @@ header.nav{position:sticky;top:0;z-index:20;background:var(--nav-bg);border-bott
   .brand{font-size:20px}
   .theme-btn{padding:11px;border-radius:50%}
   .theme-word{display:none}
+}
+
+/* Yellow as TEXT on the light ground: outlined, or it is a glare rather than a
+   word. Only in light — on the dark ground the yellow already has all the edge
+   it needs, and a black outline there would just muddy it. */
+:root[data-theme="light"] .hero h1 em{
+  color:var(--signal);
+  -webkit-text-stroke:2.5px var(--ink);
+  paint-order:stroke fill;
+}
+:root[data-theme="light"] .brand .tick{
+  -webkit-text-stroke:1px var(--ink);
+  paint-order:stroke fill;
 }
 
 /* hero */
