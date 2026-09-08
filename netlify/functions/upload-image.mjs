@@ -20,7 +20,13 @@ const TYPES = {
   'image/jpeg': 'jpg', 'image/png': 'png',
   'image/webp': 'webp', 'image/avif': 'avif',
 };
-const MAX_BYTES = 8 * 1024 * 1024;   // a photograph, not a raw scan
+// A photograph, not a raw scan — but the number is set by the platform, not by
+// taste. Netlify refuses a function request over roughly 4.5 MB before this file
+// is ever loaded, and its refusal is a 413 with NO BODY, which is unreadable to
+// anything expecting JSON. The old 8 MB could therefore never fire: every file
+// it would have caught was already gone. Staying under the platform limit means
+// an oversized picture gets this explanation instead of an empty response.
+const MAX_BYTES = 4.3 * 1024 * 1024;
 
 async function whoIsThis(token) {
   if (!token) return null;

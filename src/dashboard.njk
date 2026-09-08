@@ -861,6 +861,46 @@ window.addEventListener('unhandledrejection', function (e) {
     '</div>';
   }
 
+  // Netlify refuses a function request larger than about 4.5 MB, and it refuses
+  // it BEFORE the function runs: the answer is a 413 with a zero-length body.
+  // Reading that as JSON is what produced "Unexpected end of JSON input" — an
+  // error about parsing, for a picture whose only problem was its size. The
+  // upload function's own 8 MB limit can never fire above this one, so this is
+  // the number that decides, and it is checked here where it can be said out
+  // loud before anything is sent.
+  var UPLOAD_MAX_BYTES = 4.3 * 1024 * 1024;
+
+  // The one place an upload is sent, so both the single picture and the bulk
+  // loop get the same size check and the same defensive read.
+  function postImage(file, gh){
+    if (file.size > UPLOAD_MAX_BYTES) {
+      return Promise.reject(new Error('That picture is ' + (file.size / 1048576).toFixed(1)
+        + ' MB. The uploader stops at 4.3 MB — resize it or save it again smaller, then try once more.'));
+    }
+    return fetch('/api/upload-image', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + gh, 'Content-Type': file.type },
+      body: file,
+    }).then(function(r){
+      // Text first, then parse. Calling r.json() straight off means anything that
+      // answers without a body — a platform limit, a gateway, a timeout — is
+      // reported as bad JSON instead of as what actually happened.
+      return r.text().then(function(t){
+        var d = null;
+        if (t) { try { d = JSON.parse(t); } catch (e) { d = null; } }
+        if (!r.ok) {
+          throw new Error((d && (d.message || d.error))
+            || (r.status === 413
+                ? 'That picture is too big for the uploader (' + (file.size / 1048576).toFixed(1)
+                  + ' MB). Resize it and try again.'
+                : 'The uploader returned ' + r.status + '.'));
+        }
+        if (!d) throw new Error('The uploader returned ' + r.status + ' with an empty body.');
+        return d;
+      });
+    });
+  }
+
   // Uploading goes to this site, not to the API. Netlify Blobs lives with the
   // site, and the file never touches the repository — which is the entire point:
   // 36,999 images are 4.5 GB of git history that will never be diffed or merged.
@@ -876,13 +916,7 @@ window.addEventListener('unhandledrejection', function (e) {
     }
     if (label) label.textContent = 'Uploading ' + file.name + '\u2026';
     if (btn) btn.disabled = true;
-    fetch('/api/upload-image', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + sess.gh, 'Content-Type': file.type },
-      body: file,
-    }).then(function(r){
-      return r.json().then(function(d){ if (!r.ok) throw new Error(d.message || ('Upload failed (' + r.status + ')')); return d; });
-    }).then(function(d){
+    postImage(file, sess.gh).then(function(d){
       var src = document.querySelector(attr('data-picsrc', id));
       if (src) src.value = d.url;
       if (label) label.textContent = 'Uploaded ' + (d.bytes / 1024).toFixed(0) + ' KB. Add the credit, then Save picture.';
@@ -914,13 +948,7 @@ window.addEventListener('unhandledrejection', function (e) {
     log.appendChild(line);
     nudgeIntoView(line);
 
-    return fetch('/api/upload-image', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + sess.gh, 'Content-Type': file.type },
-      body: file,
-    }).then(function(r){
-      return r.json().then(function(d){ if (!r.ok) throw new Error(d.message || ('upload failed (' + r.status + ')')); return d; });
-    }).then(function(up){
+    return postImage(file, sess.gh).then(function(up){
       return api('/api/admin/places/' + encodeURIComponent(id) + '/picture', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ image: up.url, attribution: credit })
@@ -2134,7 +2162,19 @@ window.addEventListener('unhandledrejection', function (e) {
               (enrich.city ? '&city=' + encodeURIComponent(enrich.city) : '') +
               (enrich.category ? '&category=' + encodeURIComponent(enrich.category) : '') +
               (enrich.q ? '&q=' + encodeURIComponent(enrich.q) : ''))
-            .then(function(d){ enrich.cities = d.cities || []; enrich.categories = d.categories || []; enrich.listsFor = key; })
+            .then(function(d){
+              // The API returns cities most-missing first, which is the right
+              // order for "where is the most work" and the wrong one for "find
+              // the city I am thinking of". Looking one up by name is what this
+              // dropdown is actually for, so it is sorted by name here rather
+              // than at the source — the counts still show, they just no longer
+              // decide the order. localeCompare, not <, so an accented name sorts
+              // where a reader expects it instead of after Z.
+              enrich.cities = (d.cities || []).slice().sort(function(a, b){
+                return String(a.city).localeCompare(String(b.city), undefined, { sensitivity: 'base' });
+              });
+              enrich.categories = d.categories || []; enrich.listsFor = key;
+            })
             .catch(function(){ enrich.cities = []; enrich.categories = []; })
         : Promise.resolve();
       return listReq.then(function(){
