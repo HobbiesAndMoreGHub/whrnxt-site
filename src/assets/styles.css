@@ -323,13 +323,18 @@ input::placeholder,textarea::placeholder{color:var(--muted)}
 .trip-find-box button{background:transparent;border:1px solid var(--line);color:var(--muted);
   border-radius:10px;padding:0 14px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}
 .trip-find-box button:hover{color:var(--ink);border-color:var(--muted)}
-.trip-find .find-suggest{position:absolute;top:100%;left:0;right:0;margin-top:6px;z-index:30;
-  background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;
-  list-style:none;padding:4px;box-shadow:var(--shadow-soft)}
-.trip-find .find-suggest-item{display:flex;justify-content:space-between;align-items:center;gap:12px;
+.find-suggest{position:absolute;top:100%;left:0;right:0;margin-top:6px;z-index:30;
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  list-style:none;padding:4px;box-shadow:var(--shadow-soft);
+  /* A city can hold eighty places, and the whole list opens on focus. */
+  max-height:298px;overflow-y:auto}
+.find-suggest-item{display:flex;justify-content:space-between;align-items:center;gap:12px;
   padding:9px 11px;border-radius:7px;cursor:pointer;font-size:14.5px;color:var(--ink)}
-.trip-find .find-suggest-item:hover,.trip-find .find-suggest-item.active{background:var(--panel-2)}
-.trip-find .find-suggest-n{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
+.find-suggest-item:hover,.find-suggest-item.active{background:var(--panel-2)}
+.find-suggest-n{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
+/* Any field that owns a suggestion list needs to be the thing it hangs from. */
+.pick{position:relative}
+.pick input:disabled{opacity:.5;cursor:not-allowed}
 .trip-heading{font-family:var(--body);font-size:16px;letter-spacing:0;text-transform:none;
   color:var(--ink);font-weight:800;margin:0 0 16px}
 .trip-heading-tail{font-weight:600;color:var(--muted)}

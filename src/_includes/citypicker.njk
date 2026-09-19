@@ -50,8 +50,17 @@
     }
     function pick(c) {
       if (!c) return;
-      // Append rather than replace: a trip can span several cities, and someone
-      // half way through "Lisbon, " is adding one, not correcting one.
+      // One town, when the caller asks for one: a photograph is of somewhere,
+      // not of an itinerary. Otherwise append — a trip can span several cities,
+      // and someone half way through "Lisbon, " is adding one, not correcting
+      // one.
+      if (opts.single) {
+        input.value = c.name;
+        if (opts.onPick) opts.onPick(c, [c.name]);
+        close();
+        input.focus();
+        return;
+      }
       var parts = input.value.split(SEP).map(function (s) { return s.trim(); }).filter(Boolean);
       parts.pop();
       if (parts.indexOf(c.name) === -1) parts.push(c.name);
@@ -61,7 +70,7 @@
       input.focus();
     }
     function search() {
-      var last = (input.value.split(SEP).pop() || '').trim().toLowerCase();
+      var last = (opts.single ? input.value : (input.value.split(SEP).pop() || '')).trim().toLowerCase();
       if (last.length < 2) return close();
       cities().then(function (all) {
         var starts = [], has = [];
@@ -90,6 +99,83 @@
       var li = e.target.closest('[data-i]');
       if (li) { e.preventDefault(); pick(items[+li.getAttribute('data-i')]); }
     });
+  };
+
+  // The same dropdown over whatever the caller hands it, rather than the city
+  // list. `items` returns a promise of [{ id, name, tag }]; `tag` is the muted
+  // note on the right. With an empty box it opens the whole list, so it answers
+  // both "let me type it" and "just show me what there is" with one control.
+  window.whrnxtListPicker = function (input, opts) {
+    opts = opts || {};
+    if (!input) return;
+    var box = document.createElement('ul');
+    box.className = 'find-suggest';
+    box.style.display = 'none';
+    input.parentNode.insertBefore(box, input.nextSibling);
+    var items = [], idx = -1, timer = null;
+
+    function close() { box.style.display = 'none'; items = []; idx = -1; }
+    function draw() {
+      if (!items.length) return close();
+      box.innerHTML = items.map(function (it, i) {
+        return '<li class="find-suggest-item' + (i === idx ? ' active' : '') + '" data-i="' + i + '">' +
+               '<span class="find-suggest-name"></span><span class="find-suggest-n"></span></li>';
+      }).join('');
+      // textContent throughout: these names come from the database, and the
+      // database is full of apostrophes and ampersands.
+      Array.prototype.forEach.call(box.querySelectorAll('.find-suggest-item'), function (li, i) {
+        li.querySelector('.find-suggest-name').textContent = items[i].name;
+        li.querySelector('.find-suggest-n').textContent = items[i].tag || '';
+      });
+      box.style.display = '';
+      box.scrollTop = 0;
+    }
+    function pick(it) {
+      if (!it) return;
+      input.value = it.name;
+      if (opts.onPick) opts.onPick(it);
+      close();
+    }
+    function search() {
+      if (input.disabled) return close();
+      var q = input.value.trim().toLowerCase();
+      Promise.resolve(opts.items ? opts.items() : []).then(function (all) {
+        all = all || [];
+        if (!q) { items = all.slice(0, 200); idx = -1; return draw(); }
+        var starts = [], has = [];
+        for (var i = 0; i < all.length && starts.length + has.length < 200; i++) {
+          var k = String(all[i].name || '').toLowerCase();
+          if (k.indexOf(q) === 0) starts.push(all[i]);
+          else if (k.indexOf(q) > 0) has.push(all[i]);
+        }
+        items = starts.concat(has).slice(0, 60);
+        idx = -1;
+        draw();
+      });
+    }
+    input.addEventListener('focus', search);
+    input.addEventListener('input', function () {
+      if (opts.onType) opts.onType();
+      clearTimeout(timer);
+      timer = setTimeout(search, 140);
+    });
+    input.addEventListener('keydown', function (e) {
+      if (!items.length) return;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        idx = (idx + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+        draw();
+        var on = box.querySelector('.find-suggest-item.active');
+        if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'Enter' && idx >= 0) { e.preventDefault(); pick(items[idx]); }
+      else if (e.key === 'Escape') { close(); }
+    });
+    input.addEventListener('blur', function () { setTimeout(close, 160); });
+    box.addEventListener('mousedown', function (e) {
+      var li = e.target.closest('[data-i]');
+      if (li) { e.preventDefault(); pick(items[+li.getAttribute('data-i')]); }
+    });
+    return { close: close, refresh: search };
   };
 })();
 </script>

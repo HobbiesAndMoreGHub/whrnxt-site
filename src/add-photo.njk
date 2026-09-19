@@ -20,12 +20,16 @@ permalink: /add-photo/index.html
       <form id="photo-form" novalidate>
         <p hidden><label>Leave blank: <input name="website" tabindex="-1" autocomplete="off"></label></p>
 
-        <label class="f" for="ph-place">Which place is it of?</label>
-        <input id="ph-place" name="placeName" placeholder="Aachen Cathedral" required maxlength="200" autocomplete="off">
+        <label class="f" for="ph-city">Which town or city?</label>
+        <div class="pick">
+          <input id="ph-city" name="placeCity" placeholder="Start typing — Aachen" required maxlength="120" autocomplete="off">
+        </div>
 
-        <label class="f" for="ph-city" style="margin-top:16px">Which town or city?</label>
-        <input id="ph-city" name="placeCity" placeholder="Aachen" required maxlength="120" autocomplete="off">
-        <p class="fine">Whatever you would call them both. We will match it to the right place in the guide.</p>
+        <label class="f" for="ph-place" style="margin-top:16px">Which place is it of?</label>
+        <div class="pick">
+          <input id="ph-place" name="placeName" placeholder="Choose the town first" required maxlength="200" autocomplete="off">
+        </div>
+        <p class="fine" id="ph-pick-hint">Both search the guide as you type. If what you want is not in the list, type it anyway — we will match it by hand.</p>
 
         <div class="ph-drop" id="ph-drop" role="button" tabindex="0" style="margin-top:16px">
           <input type="file" id="ph-file" accept="image/jpeg,image/png" hidden>
@@ -50,6 +54,7 @@ permalink: /add-photo/index.html
 </div></section>
 
 
+{% include "citypicker.njk" %}
 {% if site.turnstileSiteKey %}<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>{% endif %}
 {% raw %}<script>
 (function () {
@@ -70,6 +75,85 @@ permalink: /add-photo/index.html
   var btn = document.getElementById('ph-submit');
   var widgetId = null;
   var chosen = null;
+
+  // Which place in the guide they actually picked, if they picked one. It buys
+  // the reviewer the whole linking step: the API takes a place id and files the
+  // photograph against it on the spot. Typed text still works — it just lands
+  // in the queue unlinked, for somebody to match by hand.
+  var citySlug = '', cityName = '', placeId = '';
+  var cityInput = document.getElementById('ph-city');
+  var placeInput = document.getElementById('ph-place');
+  var hint = document.getElementById('ph-pick-hint');
+  var placeCache = {};
+
+  function placesForCity() {
+    if (!citySlug) return Promise.resolve([]);
+    if (placeCache[citySlug]) return Promise.resolve(placeCache[citySlug]);
+    return fetch(API + '/api/cities/' + encodeURIComponent(citySlug) + '/places')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        var list = ((d && d.places) || []).map(function (pl) {
+          return {
+            id: pl.id,
+            name: pl.name,
+            // Worth saying plainly: the places with nothing are the ones where
+            // a photograph is most use, and people send pictures of the famous
+            // ones we already have.
+            tag: (pl.image || '').trim() ? 'has a photo' : 'no photo yet'
+          };
+        });
+        placeCache[citySlug] = list;
+        return list;
+      })
+      .catch(function () { return []; });
+  }
+
+  // Never disabled. Somewhere we do not cover has no town in the list either,
+  // and the person holding a photograph of it still has to be able to type.
+  function guidePlaceField() {
+    placeInput.placeholder = citySlug
+      ? 'Start typing, or click for the whole list'
+      : 'Type the name, or choose a town above first';
+  }
+
+  if (window.whrnxtCityPicker) {
+    window.whrnxtCityPicker(cityInput, {
+      api: API, single: true,
+      onPick: function (c) {
+        citySlug = c.slug;
+        cityName = c.name;
+        placeId = '';
+        placeInput.value = '';
+        placeInput.removeAttribute('data-picked-name');
+        guidePlaceField();
+        placesForCity().then(function (list) {
+          hint.textContent = list.length
+            ? list.length + ' places in ' + c.name + '. Start typing, or click the box to see them all.'
+            : 'Nothing listed for ' + c.name + ' yet — type what the place is called and we will match it by hand.';
+        });
+        placeInput.focus();
+      }
+    });
+  }
+  // Typing over a chosen town drops the choice: the list on the right of it is
+  // no longer about what the box says.
+  cityInput.addEventListener('input', function () {
+    if (citySlug && cityInput.value.trim().toLowerCase() !== cityName.toLowerCase()) {
+      citySlug = ''; cityName = ''; placeId = '';
+      placeInput.removeAttribute('data-picked-name');
+      hint.textContent = 'Both search the guide as you type. If what you want is not in the list, type it anyway — we will match it by hand.';
+      guidePlaceField();
+    }
+  });
+
+  if (window.whrnxtListPicker) {
+    window.whrnxtListPicker(placeInput, {
+      items: placesForCity,
+      onPick: function (it) { placeId = it.id; placeInput.setAttribute('data-picked-name', it.name); },
+      onType: function () { placeId = ''; }
+    });
+  }
+  guidePlaceField();
 
   if (SITE_KEY) {
     var t = setInterval(function () {
@@ -175,6 +259,10 @@ permalink: /add-photo/index.html
       var fd = new FormData();
       fd.append('placeName', placeName);
       fd.append('placeCity', placeCity);
+      // Only if it still matches what is in the box. Picking a place and then
+      // editing the name means they changed their mind, and filing the photo
+      // against the old id would be worse than not filing it at all.
+      if (placeId && placeName === placeInput.getAttribute('data-picked-name')) fd.append('placeId', placeId);
       fd.append('credit', credit);
       fd.append('note', document.getElementById('ph-note').value.trim());
       fd.append('website', form.elements.website ? form.elements.website.value : '');
