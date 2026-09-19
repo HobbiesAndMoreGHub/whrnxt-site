@@ -62,9 +62,9 @@ permalink: /add-place/index.html
         <p class="fine">JPEG or PNG, at least 600px wide. It is scaled to 1200px in your browser before it is sent, so a full-size phone photo is fine even on hotel wifi.</p>
 
         <div id="pl-credit-wrap" hidden>
-          <label class="f" for="pl-credit" style="margin-top:12px">Who took it?</label>
-          <input id="pl-credit" name="credit" placeholder="Photo: Your Name (CC BY-SA 4.0)" maxlength="300">
-          <p class="fine">Every photograph in the guide carries a credit, so we cannot use one without this. If it is yours, your name is enough — and please only send photographs you took, or are free to give away.</p>
+          <label class="f" for="pl-credit" style="margin-top:12px">Who took it? <span class="fine">(optional)</span></label>
+          <input id="pl-credit" name="credit" placeholder="Your name" maxlength="300">
+          <p class="fine">Leave it blank and it is credited to <em>Submitted by user</em>. Please only send photographs you took, or are free to give away.</p>
         </div>
 
         <div id="pl-captcha" style="margin:12px 0"></div>
@@ -211,13 +211,11 @@ permalink: /add-place/index.html
     var lng = document.getElementById('pl-lng').value.trim();
     if ((lat && !lng) || (lng && !lat)) return fail('Give both latitude and longitude, or leave both blank.');
 
-    // Asked for here rather than after the upload, because the server refuses an
-    // uncredited photograph and finding that out afterwards is the worst of both.
+    // Blank is allowed: the server credits it to "Submitted by user" rather
+    // than refusing it. Somebody standing in front of a place we do not cover
+    // should not be stopped by a box about licensing.
     var credit = '';
-    if (chosen) {
-      credit = document.getElementById('pl-credit').value.trim();
-      if (credit.length < 4) return fail('Please say who took the photo, so we can credit it.');
-    }
+    if (chosen) credit = document.getElementById('pl-credit').value.trim();
 
     var token = '';
     if (SITE_KEY) {
