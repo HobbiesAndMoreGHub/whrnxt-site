@@ -1,0 +1,222 @@
+---
+layout: base.njk
+title: Send a photo
+description: Have a good photograph of a place in the guide? Send it in. Every photo is checked and credited by a person before it reaches the app.
+permalink: /add-photo/index.html
+---
+<section class="block"><div class="wrap">
+  <div class="sec-head">
+    <span class="label">Community</span>
+    <h2>Got a better photo than ours?</h2>
+    <p>Thousands of places in the guide have no picture, and plenty more have one that does the place no favours. If you have a photograph of somewhere WHRNXT covers, we would like it — it goes to a person before it goes on the site, and it is credited to you.</p>
+  </div>
+
+  {% if not site.turnstileSiteKey %}<div class="plan-warn" style="border-color:#b8860b;margin-bottom:16px">
+    <strong>Not live yet</strong>
+    <p class="fine">This form needs a Cloudflare Turnstile site key before it will work. Set <code>turnstileSiteKey</code> in <code>src/_data/site.json</code> and <code>TURNSTILE_SECRET</code> on the API. Until then the server refuses submissions on purpose.</p>
+  </div>{% endif %}
+
+  <div class="split">
+    <div class="panel-lg">
+      <form id="photo-form" novalidate>
+        <p hidden><label>Leave blank: <input name="website" tabindex="-1" autocomplete="off"></label></p>
+
+        <label class="f" for="ph-place">Which place is it of?</label>
+        <input id="ph-place" name="placeId" placeholder="aachen-001" required maxlength="200" autocomplete="off">
+        <p class="fine">The id shown on the place's page in the app — letters, numbers, dots, dashes and underscores.</p>
+
+        <div class="ph-drop" id="ph-drop" role="button" tabindex="0" style="margin-top:16px">
+          <input type="file" id="ph-file" accept="image/jpeg,image/png" hidden>
+          <span id="ph-drop-text">Choose a photo, or drop one here</span>
+          <img class="ph-preview" id="ph-preview" alt="">
+        </div>
+        <p class="fine">JPEG or PNG, at least 600px wide. It is scaled to 1200px in your browser before it is sent, so a full-size phone photo is fine even on hotel wifi.</p>
+
+        <label class="f" for="ph-credit" style="margin-top:16px">Who took it?</label>
+        <input id="ph-credit" name="credit" placeholder="Photo: Your Name (CC BY-SA 4.0)" required maxlength="300">
+        <p class="fine">Every photograph in the guide carries a credit, so we cannot use one without this. If it is yours, your name is enough — and please only send photographs you took, or are free to give away.</p>
+
+        <label class="f" for="ph-note" style="margin-top:16px">Anything we should know <span class="fine">(optional)</span></label>
+        <textarea id="ph-note" name="note" rows="3" maxlength="500" placeholder="When it was taken, what it shows, which side of the building…"></textarea>
+
+        <div id="ph-captcha" style="margin:12px 0"></div>
+
+        <button class="btn btn-signal" type="submit" id="ph-submit" style="align-self:flex-start">Send the photo &#9656;</button>
+      </form>
+      <p class="fine" id="ph-msg">Every photo is looked at by a person before it reaches the app. No account needed.</p>
+    </div>
+
+    <div class="panel-lg">
+      <span class="label">What happens next</span>
+      <h2>Looked at, then published.</h2>
+      <p>Submitted photos go into a review queue, where they are seen next to whatever picture that place has now — because "is this one better" is the actual question, and it cannot be answered from one image.</p>
+      <p>If it is approved it fills or replaces that place's picture at the next publish, with your credit alongside it. If it is not, nothing happens and the file is deleted.</p>
+      <p class="fine">Know a place we are missing altogether? <a href="/add-place/">Add a place</a> instead.</p>
+    </div>
+  </div>
+</div></section>
+
+<style>
+  /* The drop zone is the only thing on this page the house stylesheet has no
+     shape for. Everything else — inputs, panels, the button — is site CSS. */
+  .ph-drop{border:2px dashed var(--line);border-radius:10px;padding:26px 18px;text-align:center;
+    cursor:pointer;background:var(--field);color:var(--ink-3)}
+  .ph-drop:hover,.ph-drop:focus-visible{border-color:var(--signal);color:var(--ink)}
+  .ph-drop.is-over{border-color:var(--signal);background:var(--panel);color:var(--ink)}
+  .ph-preview{max-width:100%;border-radius:8px;display:none;margin-top:14px}
+</style>
+
+{% if site.turnstileSiteKey %}<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>{% endif %}
+{% raw %}<script>
+(function () {
+  var API = {% endraw %}{{ site.apiUrl | dump | safe }}{% raw %};
+  var SITE_KEY = {% endraw %}{{ site.turnstileSiteKey | dump | safe }}{% raw %};
+
+  var MAX_WIDTH = 1200;      // matches every curated image in the guide
+  var MIN_WIDTH = 600;       // the server refuses anything narrower
+  var JPEG_QUALITY = 0.85;
+
+  var form = document.getElementById('photo-form');
+  if (!form) return;
+  var fileInput = document.getElementById('ph-file');
+  var drop = document.getElementById('ph-drop');
+  var dropText = document.getElementById('ph-drop-text');
+  var preview = document.getElementById('ph-preview');
+  var msg = document.getElementById('ph-msg');
+  var btn = document.getElementById('ph-submit');
+  var widgetId = null;
+  var chosen = null;
+
+  if (SITE_KEY) {
+    var t = setInterval(function () {
+      if (window.turnstile) {
+        clearInterval(t);
+        widgetId = window.turnstile.render('#ph-captcha', { sitekey: SITE_KEY });
+      }
+    }, 150);
+    setTimeout(function () { clearInterval(t); }, 15000);
+  }
+
+  function say(text, good) {
+    msg.textContent = text;
+    msg.style.color = good ? '' : '#ff9b9b';
+  }
+  function fail(m) {
+    say(m, false);
+    btn.disabled = false;
+    btn.textContent = 'Send the photo ▸';
+    if (widgetId !== null && window.turnstile) window.turnstile.reset(widgetId);
+  }
+
+  drop.addEventListener('click', function () { fileInput.click(); });
+  drop.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+  });
+  drop.addEventListener('dragover', function (e) { e.preventDefault(); drop.classList.add('is-over'); });
+  drop.addEventListener('dragleave', function () { drop.classList.remove('is-over'); });
+  drop.addEventListener('drop', function (e) {
+    e.preventDefault();
+    drop.classList.remove('is-over');
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) take(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', function () { if (fileInput.files[0]) take(fileInput.files[0]); });
+
+  function take(file) {
+    if (!/^image\/(jpeg|png)$/.test(file.type)) return fail('That needs to be a JPEG or PNG photograph.');
+    chosen = file;
+    dropText.textContent = file.name + ' — ' + Math.round(file.size / 1024) + ' KB';
+    var url = URL.createObjectURL(file);
+    preview.src = url;
+    preview.style.display = 'block';
+    preview.onload = function () { URL.revokeObjectURL(url); };
+    say('Ready to send.', true);
+  }
+
+  // Draw it into a canvas at 1200px wide and read it back as a JPEG. Anything
+  // already narrower is left alone rather than upscaled, which would add bytes
+  // and no detail. The server does not trust any of this — it reads the real
+  // dimensions out of the file itself — but doing it here is what keeps an
+  // image library off the API and a 4 MB upload off a hotel connection.
+  function shrink(file) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        if (img.width < MIN_WIDTH) return reject(new Error('That photo is ' + img.width +
+          'px wide. It needs to be at least ' + MIN_WIDTH + 'px — it would look soft on a card.'));
+        var w = Math.min(img.width, MAX_WIDTH);
+        var h = Math.round(img.height * (w / img.width));
+        var c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        var ctx = c.getContext('2d');
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, w, h);
+        c.toBlob(function (blob) {
+          if (!blob) return reject(new Error('The photo could not be processed in this browser.'));
+          resolve(blob);
+        }, 'image/jpeg', JPEG_QUALITY);
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error('That file could not be read as an image.'));
+      };
+      img.src = url;
+    });
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var placeId = document.getElementById('ph-place').value.trim();
+    var credit = document.getElementById('ph-credit').value.trim();
+    if (!placeId) return fail('Which place is the photo of?');
+    // The same shape the server insists on. Checking it here names the problem;
+    // the server answers every kind of bad id with the same one-line message.
+    if (!/^[A-Za-z0-9._-]+$/.test(placeId)) {
+      return fail('That does not look like a place id — it should be something like aachen-001, with no spaces.');
+    }
+    if (!chosen) return fail('Choose a photo first.');
+    if (credit.length < 4) return fail('Please say who took the photo, so we can credit it.');
+
+    var token = '';
+    if (SITE_KEY) {
+      token = (widgetId !== null && window.turnstile) ? window.turnstile.getResponse(widgetId) : '';
+      if (!token) return fail('Please complete the verification box.');
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Preparing…';
+    say('Scaling the photo in your browser…', true);
+
+    shrink(chosen).then(function (blob) {
+      var fd = new FormData();
+      fd.append('placeId', placeId);
+      fd.append('credit', credit);
+      fd.append('note', document.getElementById('ph-note').value.trim());
+      fd.append('website', form.elements.website ? form.elements.website.value : '');
+      fd.append('captchaToken', token);
+      fd.append('photo', blob, 'photo.jpg');
+      btn.textContent = 'Sending…';
+      say('Sending — ' + Math.round(blob.size / 1024) + ' KB.', true);
+      return fetch(API + '/api/web/picture-submit', { method: 'POST', body: fd });
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (body) {
+        return { ok: r.ok, body: body };
+      });
+    }).then(function (res) {
+      if (!res.ok) throw new Error(res.body.message || 'That could not be sent.');
+      form.reset();
+      chosen = null;
+      preview.style.display = 'none';
+      preview.removeAttribute('src');
+      dropText.textContent = 'Choose a photo, or drop one here';
+      btn.disabled = false;
+      btn.textContent = 'Send the photo ▸';
+      say('Thank you — it is with us, and someone will look at it.', true);
+      if (widgetId !== null && window.turnstile) window.turnstile.reset(widgetId);
+    }).catch(function (err) {
+      fail(err.message);
+    });
+  });
+})();
+</script>{% endraw %}

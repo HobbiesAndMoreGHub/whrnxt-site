@@ -123,7 +123,7 @@ header.nav{position:sticky;top:0;z-index:20;background:var(--nav-bg);border-bott
 .nav-links{margin-left:auto}
 /* Below 820px the links used to be display:none outright, so a phone had no way
    to reach anything but the footer's Articles link. They move onto their own row
-   instead, and wrap within it when the four of them are wider than the screen —
+   instead, and wrap within it when the five of them are wider than the screen —
    which they are on most phones. Wrapping rather than side-scrolling is what
    lets them stay centred: a centred row that overflows pushes its first item off
    the left edge, where nothing can scroll back to it. */
