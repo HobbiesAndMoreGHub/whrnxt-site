@@ -108,6 +108,23 @@ eleventyExcludeFromCollections: true
     background:rgba(210,153,34,.10);border:1px solid rgba(210,153,34,.42);border-radius:12px;
     padding:14px 16px;margin:0 0 18px}
   .pending-body{min-width:0}
+  .pending-list{flex:1 0 100%;display:none;margin-top:6px;border-top:1px solid var(--line);padding-top:10px}
+  .pending-list.on{display:block}
+  .pl-row{display:flex;gap:11px;align-items:center;padding:8px 2px;border-bottom:1px solid var(--line)}
+  .pl-row:last-child{border-bottom:none}
+  .pl-thumb{width:58px;height:39px;flex:0 0 auto;object-fit:cover;border-radius:5px;
+    background:var(--panel-2);border:1px solid var(--line)}
+  .pl-main{min-width:0;flex:1 1 auto}
+  .pl-name{color:var(--ink);font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pl-meta{color:var(--muted);font-size:12px;margin-top:2px}
+  .pl-meta a{color:var(--accent-ink,var(--signal))}
+  .pl-tags{display:flex;gap:5px;flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end;max-width:170px}
+  .pl-tag{font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+    border-radius:999px;padding:3px 8px;background:var(--panel-2);color:var(--muted);border:1px solid var(--line)}
+  .pl-tag.pic{background:#123024;color:#7fd7a5;border-color:#245c41}
+  .pl-tag.loc{background:#2a2412;color:#e6c06a;border-color:#5d4c1d}
+  .pl-tag.txt{background:#12233a;color:#8dbdf0;border-color:#24466e}
+  .pl-tag.rm{background:#3a1616;color:#f0a0a0;border-color:#6e2828}
   .pending-body strong{display:block;color:var(--ink);font-size:15px;margin-bottom:3px}
   .pending-body span{display:block;color:var(--muted);font-size:13.5px;line-height:1.5}
   .enrich-filter select,.enrich-filter input{background:#0d1117;border:1px solid var(--line);color:var(--ink);
@@ -1685,9 +1702,75 @@ window.addEventListener('unhandledrejection', function (e) {
         '<span>' + esc(bits.join(', ')) + '. Saved here, but the app will not show ' +
           (p.total === 1 ? 'it' : 'them') + ' until you publish. ' + last + '</span>' +
       '</div>' +
-      '<button class="btn btn-signal" data-go-publish="1"' + (publishing ? ' disabled' : '') + '>' +
-        (publishing ? 'Publishing\u2026' : 'Publish now') + '</button>' +
+      '<div class="acts" style="flex:0 0 auto;gap:8px">' +
+        '<button class="btn" data-pending-list="1">Show what changed</button>' +
+        '<button class="btn btn-signal" data-go-publish="1"' + (publishing ? ' disabled' : '') + '>' +
+          (publishing ? 'Publishing\u2026' : 'Publish now') + '</button>' +
+      '</div>' +
+      '<div class="pending-list" id="pending-list"></div>' +
     '</div>';
+  }
+
+  // The rows behind the count. Fetched when asked for rather than with the
+  // overview: most visits never open it, and it is the only call on this page
+  // that reads a hundred places.
+  var pendingListOpen = false;
+  function renderPendingList(d){
+    var box = $('pending-list');
+    if (!box) return;
+    var base = (d.publicBase || '').replace(/\/$/, '');
+    var parts = [];
+
+    (d.places || []).forEach(function(pl){
+      var tags = pl.changed.map(function(c){
+        return '<span class="pl-tag ' + (c === 'picture' ? 'pic' : c === 'text' ? 'txt' : 'loc') + '">' +
+          (c === 'picture' ? 'picture' : c === 'text' ? 'description' : 'location') + '</span>';
+      }).join('');
+      // The picture itself, when that is what changed — "show me what was sent"
+      // is not answered by the word "picture".
+      var thumb = (pl.changed.indexOf('picture') !== -1 && base && pl.image)
+        ? '<img class="pl-thumb" src="' + esc(base + '/' + String(pl.image).replace(/^img\//, '')) + '" alt="">'
+        : '<div class="pl-thumb"></div>';
+      var meta = [];
+      meta.push(esc(pl.id));
+      if (pl.city) meta.push(esc(pl.city) + (pl.country ? ', ' + esc(pl.country) : ''));
+      if (pl.changed.indexOf('location') !== -1 && pl.lat != null && pl.lng != null) {
+        // A pin is only checkable on a map, so link straight to the coordinates
+        // rather than printing numbers nobody can picture.
+        meta.push('<a href="https://www.google.com/maps?q=' + encodeURIComponent(pl.lat + ',' + pl.lng) +
+          '" target="_blank" rel="noopener">' + esc(Number(pl.lat).toFixed(4)) + ', ' +
+          esc(Number(pl.lng).toFixed(4)) + ' \u2197</a>');
+        if (pl.coordSource) meta.push(esc(pl.coordSource));
+      }
+      if (pl.changed.indexOf('picture') !== -1 && pl.credit) meta.push(esc(pl.credit));
+      if (pl.at) meta.push(when(pl.at));
+      if (pl.by) meta.push('by ' + esc(pl.by));
+      parts.push('<div class="pl-row">' + thumb +
+        '<div class="pl-main"><div class="pl-name">' + esc(pl.name || pl.id) + '</div>' +
+        '<div class="pl-meta">' + meta.join(' \u00b7 ') + '</div></div>' +
+        '<div class="pl-tags">' + tags + '</div></div>');
+    });
+
+    (d.removals || []).forEach(function(rm){
+      var meta = [esc(rm.id)];
+      if (rm.city) meta.push(esc(rm.city));
+      if (rm.reason) meta.push(esc(rm.reason));
+      if (rm.removed_at) meta.push(when(rm.removed_at));
+      if (rm.removed_by) meta.push('by ' + esc(rm.removed_by));
+      parts.push('<div class="pl-row"><div class="pl-thumb"></div>' +
+        '<div class="pl-main"><div class="pl-name">' + esc(rm.name || rm.id) + '</div>' +
+        '<div class="pl-meta">' + meta.join(' \u00b7 ') + '</div></div>' +
+        '<div class="pl-tags"><span class="pl-tag rm">removed</span></div></div>');
+    });
+
+    var shown = (d.places || []).length + (d.removals || []).length;
+    var total = d.counts ? d.counts.total : shown;
+    if (!shown) parts.push('<div class="pl-meta" style="padding:8px 2px">Nothing is waiting.</div>');
+    else if (total > shown) parts.push('<div class="pl-meta" style="padding:8px 2px">' +
+      'Showing the ' + shown + ' most recent of ' + total + '.</div>');
+
+    box.innerHTML = parts.join('');
+    box.classList.add('on');
   }
 
   function stat(v, label, attn){
@@ -2309,6 +2392,31 @@ window.addEventListener('unhandledrejection', function (e) {
   document.addEventListener('click', function(e){
     var nav = e.target.closest('.navb[data-sec]');
     if (nav) { section = nav.getAttribute('data-sec'); status = 'pending'; renderQueue.data = null; load(); return; }
+    var pl = e.target.closest('[data-pending-list]');
+    if (pl) {
+      var box = $('pending-list');
+      if (box && pendingListOpen) {
+        box.classList.remove('on');
+        pendingListOpen = false;
+        pl.textContent = 'Show what changed';
+        return;
+      }
+      pl.disabled = true;
+      pl.textContent = 'Loading\u2026';
+      api('/api/admin/pending?limit=100').then(function(d){
+        pl.disabled = false;
+        if (!d) { pl.textContent = 'Show what changed'; return; }
+        renderPendingList(d);
+        pendingListOpen = true;
+        pl.textContent = 'Hide';
+      }).catch(function(err){
+        pl.disabled = false;
+        pl.textContent = 'Show what changed';
+        // api() already turns a refusal into a sentence worth reading.
+        say((err && err.message) || 'Could not load what is waiting.', 'bad');
+      });
+      return;
+    }
     var gp = e.target.closest('[data-go-publish]');
     if (gp) {
       var real = $('pub-go');
