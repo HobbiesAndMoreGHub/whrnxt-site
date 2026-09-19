@@ -53,6 +53,20 @@ permalink: /add-place/index.html
         <label class="f" for="pl-note" style="margin-top:12px">Anything else <span class="fine">(optional)</span></label>
         <textarea id="pl-note" name="note" rows="3" maxlength="500" placeholder="Opening hours, why it's worth going, a website — whatever you know."></textarea>
 
+        <p class="f" style="margin-top:16px;margin-bottom:2px">A photograph <span class="fine">— optional, but it is what the card will open with</span></p>
+        <div class="ph-drop" id="pl-drop" role="button" tabindex="0">
+          <input type="file" id="pl-file" accept="image/jpeg,image/png" hidden>
+          <span id="pl-drop-text">Choose a photo, or drop one here</span>
+          <img class="ph-preview" id="pl-preview" alt="">
+        </div>
+        <p class="fine">JPEG or PNG, at least 600px wide. It is scaled to 1200px in your browser before it is sent, so a full-size phone photo is fine even on hotel wifi.</p>
+
+        <div id="pl-credit-wrap" hidden>
+          <label class="f" for="pl-credit" style="margin-top:12px">Who took it?</label>
+          <input id="pl-credit" name="credit" placeholder="Photo: Your Name (CC BY-SA 4.0)" maxlength="300">
+          <p class="fine">Every photograph in the guide carries a credit, so we cannot use one without this. If it is yours, your name is enough — and please only send photographs you took, or are free to give away.</p>
+        </div>
+
         <div id="pl-captcha" style="margin:12px 0"></div>
 
         <button class="btn btn-signal" type="submit" id="pl-submit" style="align-self:flex-start">Send it in &#9656;</button>
@@ -65,7 +79,8 @@ permalink: /add-place/index.html
       <h2>Checked, then pinned.</h2>
       <p>Submissions go into a review queue. We confirm the place exists, pull its real location from Google Places, and give it a verified coordinate before it ever shows up in the app — which is why coordinates from you are a bonus rather than a requirement.</p>
       <p>If you sent coordinates, they're used as the starting point for that check, which makes a place in a big park or a rural area much easier to pin correctly.</p>
-      <p class="fine">Have a photograph of a place that is already in the guide? <a href="/add-photo/">Send us the photo</a> instead.</p>
+      <p>A photograph is judged separately, and later: it cannot be put on a place that does not exist yet, so it waits in the picture queue until the place itself has been added. If the place is turned down the photograph goes with it, and the file is deleted rather than kept.</p>
+      <p class="fine">Have a photograph of a place that is <em>already</em> in the guide? <a href="/add-photo/">Send us the photo</a> — this form is for the ones we are missing.</p>
       <p class="fine">Built a whole trip instead? <a href="/plan/">Turn a written plan into an itinerary</a>, or <a href="/#share">share a trip you've made</a>.</p>
     </div>
   </div>
@@ -77,12 +92,23 @@ permalink: /add-place/index.html
   var API = {% endraw %}{{ site.apiUrl | dump | safe }}{% raw %};
   var SITE_KEY = {% endraw %}{{ site.turnstileSiteKey | dump | safe }}{% raw %};
 
+  var MAX_WIDTH = 1200;      // matches every curated image in the guide
+  var MIN_WIDTH = 600;       // the server refuses anything narrower
+  var JPEG_QUALITY = 0.85;
+
   var form = document.getElementById('place-form');
   function honeypot() { var f = form && form.elements.website; return f ? f.value : ''; }
   var msg = document.getElementById('pl-msg');
   var btn = document.getElementById('pl-submit');
   var widgetId = null;
+  var chosen = null;
   if (!form) return;
+
+  var fileInput = document.getElementById('pl-file');
+  var drop = document.getElementById('pl-drop');
+  var dropText = document.getElementById('pl-drop-text');
+  var preview = document.getElementById('pl-preview');
+  var creditWrap = document.getElementById('pl-credit-wrap');
 
   if (SITE_KEY) {
     var t = setInterval(function () {
@@ -100,6 +126,67 @@ permalink: /add-place/index.html
     btn.disabled = false;
     btn.textContent = 'Send it in ▸';
     if (widgetId !== null && window.turnstile) window.turnstile.reset(widgetId);
+  }
+
+  // Picking the photograph. The credit box stays hidden until there is a file to
+  // credit: it is required the moment one is chosen and pointless before that,
+  // and a form that asks for nothing it does not need is the shorter form.
+  function take(file) {
+    if (!/^image\/(jpeg|png)$/.test(file.type)) return fail('That needs to be a JPEG or PNG photograph.');
+    chosen = file;
+    dropText.textContent = file.name + ' — ' + Math.round(file.size / 1024) + ' KB';
+    var url = URL.createObjectURL(file);
+    preview.src = url;
+    preview.style.display = 'block';
+    preview.onload = function () { URL.revokeObjectURL(url); };
+    creditWrap.hidden = false;
+    msg.style.color = '';
+    msg.textContent = 'Photo ready. Say who took it, below.';
+  }
+  drop.addEventListener('click', function () { fileInput.click(); });
+  drop.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+  });
+  drop.addEventListener('dragover', function (e) { e.preventDefault(); drop.classList.add('is-over'); });
+  drop.addEventListener('dragleave', function () { drop.classList.remove('is-over'); });
+  drop.addEventListener('drop', function (e) {
+    e.preventDefault();
+    drop.classList.remove('is-over');
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) take(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', function () { if (fileInput.files[0]) take(fileInput.files[0]); });
+
+  // Draw it into a canvas at 1200px wide and read it back as a JPEG. Anything
+  // already narrower is left alone rather than upscaled, which would add bytes
+  // and no detail. The server does not trust any of this — it reads the real
+  // dimensions out of the file itself — but doing it here is what keeps an
+  // image library off the API and a 4 MB upload off a hotel connection.
+  function shrink(file) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        if (img.width < MIN_WIDTH) return reject(new Error('That photo is ' + img.width +
+          'px wide. It needs to be at least ' + MIN_WIDTH + 'px — it would look soft on a card.'));
+        var w = Math.min(img.width, MAX_WIDTH);
+        var h = Math.round(img.height * (w / img.width));
+        var c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        var ctx = c.getContext('2d');
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, w, h);
+        c.toBlob(function (blob) {
+          if (!blob) return reject(new Error('The photo could not be processed in this browser.'));
+          resolve(blob);
+        }, 'image/jpeg', JPEG_QUALITY);
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error('That file could not be read as an image.'));
+      };
+      img.src = url;
+    });
   }
 
   // People paste "44.4118, 8.9298" into whichever box they clicked first. Split
@@ -124,6 +211,14 @@ permalink: /add-place/index.html
     var lng = document.getElementById('pl-lng').value.trim();
     if ((lat && !lng) || (lng && !lat)) return fail('Give both latitude and longitude, or leave both blank.');
 
+    // Asked for here rather than after the upload, because the server refuses an
+    // uncredited photograph and finding that out afterwards is the worst of both.
+    var credit = '';
+    if (chosen) {
+      credit = document.getElementById('pl-credit').value.trim();
+      if (credit.length < 4) return fail('Please say who took the photo, so we can credit it.');
+    }
+
     var token = '';
     if (SITE_KEY) {
       token = (widgetId !== null && window.turnstile) ? window.turnstile.getResponse(widgetId) : '';
@@ -131,22 +226,39 @@ permalink: /add-place/index.html
     }
 
     msg.style.color = '';
-    msg.textContent = 'Sending…';
+    msg.textContent = chosen ? 'Scaling the photo in your browser…' : 'Sending…';
     btn.disabled = true;
     btn.textContent = 'Sending…';
 
-    fetch(API + '/api/web/place-submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        city: city, name: name,
-        category: document.getElementById('pl-cat').value,
-        lat: lat, lng: lng,
-        note: document.getElementById('pl-note').value.trim(),
-        captchaToken: token,
-        website: honeypot()
-      })
-    }).then(function (r) {
+    var fields = {
+      city: city, name: name,
+      category: document.getElementById('pl-cat').value,
+      lat: lat, lng: lng,
+      note: document.getElementById('pl-note').value.trim(),
+      captchaToken: token,
+      website: honeypot()
+    };
+
+    // With no photograph this is the JSON request the form has always sent. With
+    // one, the same fields go as multipart so the file can travel with them; the
+    // endpoint reads either, and the photograph is stored after the place is
+    // safely in, so a picture it refuses cannot cost somebody the proposal.
+    var send = !chosen
+      ? fetch(API + '/api/web/place-submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(fields)
+        })
+      : shrink(chosen).then(function (blob) {
+          var fd = new FormData();
+          Object.keys(fields).forEach(function (k) { fd.append(k, fields[k]); });
+          fd.append('credit', credit);
+          fd.append('photo', blob, 'photo.jpg');
+          msg.textContent = 'Sending — the photo is ' + Math.round(blob.size / 1024) + ' KB.';
+          return fetch(API + '/api/web/place-submit', { method: 'POST', body: fd });
+        });
+
+    Promise.resolve(send).then(function (r) {
       return r.json().then(function (d) { return { ok: r.ok, d: d }; });
     }).then(function (res) {
       if (!res.ok || !res.d || !res.d.ok) {
@@ -156,11 +268,18 @@ permalink: /add-place/index.html
       var box = document.getElementById('pl-captcha');
       if (box) box.style.display = 'none';
       msg.style.color = '';
-      msg.textContent = res.d.hasCoords
+      var said = res.d.hasCoords
         ? 'Thank you — got it, with coordinates. We’ll verify the location and add it.'
         : 'Thank you — got it. We’ll find the exact location and add it.';
-    }).catch(function () {
-      fail('Could not reach the server. Check your connection and try again.');
+      // The photograph is reported on its own line, because it can be refused
+      // while the place is kept, and one cheerful "thank you" for both would be
+      // saying we have something we do not.
+      if (res.d.photo) said += ' Your photo came with it, and someone will look at both.';
+      else if (res.d.photoError) said += ' The photo did not go through, though — ' + res.d.photoError +
+        ' You can send it from the Send a photo page once the place is in.';
+      msg.textContent = said;
+    }).catch(function (err) {
+      fail(err && err.message ? err.message : 'Could not reach the server. Check your connection and try again.');
     });
   });
 })();

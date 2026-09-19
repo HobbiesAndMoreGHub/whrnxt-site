@@ -51,20 +51,11 @@ permalink: /add-photo/index.html
       <h2>Looked at, then published.</h2>
       <p>Submitted photos go into a review queue, where they are seen next to whatever picture that place has now — because "is this one better" is the actual question, and it cannot be answered from one image.</p>
       <p>If it is approved it fills or replaces that place's picture at the next publish, with your credit alongside it. If it is not, nothing happens and the file is deleted.</p>
-      <p class="fine">Know a place we are missing altogether? <a href="/add-place/">Add a place</a> instead.</p>
+      <p class="fine">Know a place we are missing altogether? <a href="/add-place/">Add a place</a> instead — and you can attach the photograph to that.</p>
     </div>
   </div>
 </div></section>
 
-<style>
-  /* The drop zone is the only thing on this page the house stylesheet has no
-     shape for. Everything else — inputs, panels, the button — is site CSS. */
-  .ph-drop{border:2px dashed var(--line);border-radius:10px;padding:26px 18px;text-align:center;
-    cursor:pointer;background:var(--field);color:var(--ink-3)}
-  .ph-drop:hover,.ph-drop:focus-visible{border-color:var(--signal);color:var(--ink)}
-  .ph-drop.is-over{border-color:var(--signal);background:var(--panel);color:var(--ink)}
-  .ph-preview{max-width:100%;border-radius:8px;display:none;margin-top:14px}
-</style>
 
 {% if site.turnstileSiteKey %}<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>{% endif %}
 {% raw %}<script>
