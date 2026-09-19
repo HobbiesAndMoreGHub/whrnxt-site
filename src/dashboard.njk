@@ -264,6 +264,8 @@ eleventyExcludeFromCollections: true
     <button class="navb on" data-sec="overview">Overview</button>
     <button class="navb" data-sec="trips">Shared trips <span class="pill" id="pill-trips" hidden></span></button>
     <button class="navb" data-sec="places">Place submissions <span class="pill" id="pill-places" hidden></span></button>
+    <a class="navb" href="{{ site.apiUrl }}/admin/photos" target="_blank" rel="noopener"
+       title="Opens the photo review screen on the API, in a new tab">Photo submissions <span class="pill" id="pill-pictures" hidden></span></a>
     <a class="navb" href="/admin/cms/">Articles &#8599;</a>
     <button class="navb" data-sec="unpinned">Unverified locations <span class="pill" id="pill-unpinned" hidden></span></button>
     <button class="navb" data-sec="cities">Cities</button>
@@ -2220,7 +2222,7 @@ window.addEventListener('unhandledrejection', function (e) {
 
   function updatePills(){
     if (!summary) return;
-    [['trips','pill-trips'],['places','pill-places']].forEach(function(pair){
+    [['trips','pill-trips'],['places','pill-places'],['pictures','pill-pictures']].forEach(function(pair){
       var n = ((summary[pair[0]]||{}).pending) || 0;
       var el = $(pair[1]);
       el.textContent = n; el.hidden = n === 0;
